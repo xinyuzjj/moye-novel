@@ -1,0 +1,24 @@
+# 依赖
+node_modules/
+
+# 构建中间产物（由 build.mjs 自动生成）
+resources/
+.tmp/
+temp/
+
+# 构建输出（二进制成品通过 GitHub Releases 发布，不入库）
+dist/
+
+# 运行 / 调试日志
+*.log
+neutralinojs.log
+
+# 本机数据（用户稿件，勿入库）
+data/
+
+# 编辑器 / 系统缓存
+.DS_Store
+Thumbs.db
+
+# 工作区记忆（本地 agent 记忆，非项目资产）
+.workbuddy/

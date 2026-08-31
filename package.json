@@ -1,0 +1,15 @@
+{
+  "name": "moye-novel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "墨页 · 本地轻量小说写作软件（Neutralino 桌面壳 + 单文件内联构建）",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node test/smoke.mjs"
+  },
+  "devDependencies": {
+    "@neutralinojs/neu": "^6.0.0",
+    "@electron/asar": "^3.2.0",
+    "jsdom": "^24.0.0"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "applicationId": "com.moye.novel",
+  "version": "1.0.0",
+  "defaultMode": "window",
+  "documentRoot": "/resources/",
+  "url": "/",
+  "enableServer": true,
+  "enableNativeAPI": true,
+  "tokenSecurity": "one-time",
+  "modes": {
+    "window": {
+      "title": "墨页 · 小说写作",
+      "width": 1280,
+      "height": 840,
+      "minWidth": 920,
+      "minHeight": 600,
+      "center": true,
+      "hidden": false,
+      "maximize": false,
+      "resizable": true,
+      "fullScreen": false,
+      "alwaysOnTop": false,
+      "icon": "/resources/icons/appIcon.png",
+      "transparent": false,
+      "backgroundColor": "#f3efe6",
+      "enableInspector": true,
+      "enableDevTools": true
+    },
+    "browser": {
+      "userAgent": "MoyeNovel"
+    },
+    "cloud": {
+      "clientId": ""
+    }
+  },
+  "cli": {
+    "binaryName": "墨页",
+    "resourcesPath": "/resources/",
+    "clientLibrary": "/resources/js/neutralino.js",
+    "binaryVersion": "6.9.0",
+    "clientVersion": "6.9.0",
+    "neutralinoPath": "/bin/",
+    "extensionsPath": "/extensions/",
+    "devPort": 0,
+    "port": 0,
+    "enableNativeAPI": true,
+    "enableExtensions": false
+  },
+  "nativeAllowList": [
+    "app.*",
+    "os.*",
+    "filesystem.*",
+    "window.*"
+  ],
+  "globalVariables": {}
+}

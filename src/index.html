@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>墨页 · 小说写作</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  /* 启动错误浮层：任何脚本/运行环境错误都显示在这里，避免白屏 */
+  /* 启动错误浮层：任何脚本/运行环境错误都显示在这里，避免白屏。必须盖在启动屏之上。 */
+  #bootError { position: fixed; inset: 0; z-index: 10001; display: flex; align-items: center; justify-content: center;
+    background: #f3efe6; color: #2b2b28; padding: 32px; font-family: "PingFang SC","Microsoft YaHei UI",sans-serif; }
+  #bootError[hidden] { display: none; }
+  #bootError .be-box { max-width: 640px; width: 100%; background: #fffdf8; border: 1px solid #e2dccd;
+    border-radius: 12px; padding: 26px 28px; box-shadow: 0 12px 40px rgba(0,0,0,.12); }
+  #bootError h2 { margin: 0 0 12px; font-size: 19px; font-weight: 600; }
+  #bootError pre { white-space: pre-wrap; word-break: break-word; background: #faf7f0; border: 1px solid #ece6d8;
+    border-radius: 8px; padding: 12px 14px; font-size: 12.5px; line-height: 1.6; max-height: 240px; overflow: auto; color: #7a3b2e; }
+  #bootError .muted { margin-top: 14px; color: #6b665c; font-size: 13px; line-height: 1.8; }
+  #bootError .muted b { color: #2b2b28; }
+  /* 启动屏：在 UI 渲染前显示，成功或出错后消失 */
+  #bootSplash { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center;
+    background: var(--bg); color: var(--ink); flex-direction: column; text-align: center; }
+  #bootSplash .bs-box { padding: 32px; }
+  #bootSplash h1 { margin: 0 0 14px; font-size: 38px; letter-spacing: 10px; color: var(--accent); font-weight: 700; }
+  #bootSplash p { margin: 0; color: var(--ink-soft); font-size: 14px; line-height: 1.8; }
+  #bootSplash .err { color: #a8412f; margin-top: 18px; max-width: 560px; white-space: pre-wrap; word-break: break-word; text-align: left;
+    background: #fffdf8; border: 1px solid #e2dccd; border-radius: 10px; padding: 14px 16px; font-size: 12.5px; }
+  #bootSplash .hint { margin-top: 18px; font-size: 13px; color: #6b665c; }
+</style>
+</head>
+<body data-theme="paper">
+
+<!-- 启动屏：在 UI 渲染前显示，成功或出错后消失 -->
+<div id="bootSplash">
+  <div class="bs-box">
+    <h1>墨页</h1>
+    <p id="bootSplashText">正在启动…</p>
+    <div id="bootSplashErr" class="err" hidden></div>
+    <div id="bootSplashHint" class="hint"></div>
+  </div>
+</div>
+
+<!-- 顶栏 -->
+<header class="topbar">
+  <div class="topbar-left">
+    <span class="brand">墨页</span>
+    <div class="book-switch" id="bookSwitch">
+      <button class="book-current" id="bookCurrent">我的小说</button>
+      <div class="book-menu" id="bookMenu">
+        <div class="book-list" id="bookList"></div>
+        <div class="book-menu-foot">
+          <button id="btnNewBook">＋ 新建作品</button>
+          <button id="btnBookSettings">⚙ 作品设置</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="topbar-center">
+    <span class="save-state" id="saveState">已保存</span>
+  </div>
+
+  <div class="topbar-right">
+    <button class="icon-btn" id="btnOutline" title="资料栏 (Ctrl+/)">资料</button>
+    <button class="icon-btn" id="btnFocus" title="专注模式 (F11)">专注</button>
+    <button class="icon-btn" id="btnExport" title="导出与备份">导出</button>
+    <button class="icon-btn" id="btnSettings" title="设置 (Ctrl+,)">设置</button>
+  </div>
+</header>
+
+<div class="workspace">
+
+  <!-- 左侧栏 -->
+  <aside class="sidebar" id="sidebar">
+    <nav class="side-tabs">
+      <button class="side-tab active" data-view="toc">目录</button>
+      <button class="side-tab" data-view="notes">素材</button>
+      <button class="side-tab" data-view="stats">统计</button>
+    </nav>
+
+    <!-- 目录 -->
+    <section class="side-view active" data-view="toc">
+      <div class="side-toolbar">
+        <input type="search" id="tocSearch" placeholder="搜索章节标题…" autocomplete="off">
+        <div class="tool-row">
+          <button class="mini-btn primary" id="btnNewChapter">＋ 章节</button>
+          <button class="mini-btn" id="btnNewVolume">＋ 分卷</button>
+        </div>
+      </div>
+      <div class="toc-tree" id="tocTree"></div>
+      <div class="side-foot" id="tocFoot">共 0 章 · 0 字</div>
+    </section>
+
+    <!-- 素材 -->
+    <section class="side-view" data-view="notes">
+      <div class="side-toolbar">
+        <div class="tool-row">
+          <button class="mini-btn primary" id="btnNewNote">＋ 新建素材</button>
+        </div>
+      </div>
+      <div class="note-list" id="noteList"></div>
+    </section>
+
+    <!-- 统计 -->
+    <section class="side-view" data-view="stats">
+      <div class="stats-body" id="statsBody"></div>
+    </section>
+  </aside>
+
+  <!-- 编辑器 -->
+  <main class="editor-area" id="editorArea">
+    <div class="editor-head">
+      <input type="text" id="chapterTitle" class="chapter-title" placeholder="章节标题" autocomplete="off">
+      <div class="chapter-meta">
+        <select id="chapterStatus" class="status-select">
+          <option value="draft">草稿</option>
+          <option value="writing">写作中</option>
+          <option value="done">已完成</option>
+        </select>
+        <button class="mini-btn" id="btnHistory" title="历史版本">历史</button>
+        <button class="mini-btn danger" id="btnDelChapter">删除</button>
+      </div>
+    </div>
+
+    <div class="editor-scroll" id="editorScroll">
+      <div id="editor" class="editor is-empty" contenteditable="true" spellcheck="false"
+           data-placeholder="从这里开始写你的故事…"></div>
+    </div>
+
+    <!-- 查找替换条 -->
+    <div class="find-bar" id="findBar">
+      <input type="text" id="findInput" placeholder="查找" autocomplete="off">
+      <span class="find-count" id="findCount">0/0</span>
+      <button class="mini-btn" id="findPrev">上一个</button>
+      <button class="mini-btn" id="findNext">下一个</button>
+      <input type="text" id="replaceInput" placeholder="替换为" autocomplete="off">
+      <button class="mini-btn" id="replaceOne">替换</button>
+      <button class="mini-btn" id="replaceAll">全部替换</button>
+      <button class="mini-btn" id="findClose">✕</button>
+    </div>
+  </main>
+
+  <!-- 右侧资料栏 -->
+  <aside class="outline-panel" id="outlinePanel">
+    <div class="outline-head">
+      <div class="outline-tabs" id="outlineTabs">
+        <button class="outline-tab active" data-tab="outline">大纲</button>
+        <button class="outline-tab" data-tab="character">人物</button>
+        <button class="outline-tab" data-tab="world">设定</button>
+        <button class="outline-tab" data-tab="idea">灵感</button>
+      </div>
+      <button class="icon-btn tiny" id="outlineClose" title="收起">›</button>
+    </div>
+    <textarea class="outline-body" id="outlineBody" placeholder="写下你的故事走向…" spellcheck="false"></textarea>
+    <div class="outline-wordcount" id="outlineCount">0 字</div>
+  </aside>
+</div>
+
+<!-- 底栏 -->
+<footer class="statusbar">
+  <span id="stChapter">未选择章节</span>
+  <span class="dot">·</span>
+  <span id="stWords">0 字</span>
+  <span class="dot">·</span>
+  <span id="stCursor">行 1，列 1</span>
+  <span class="spacer"></span>
+  <span id="stGoal">今日 0 / 2000</span>
+  <div class="goal-bar"><i id="goalFill"></i></div>
+  <span class="dot">·</span>
+  <span id="stTotal">全书 0 字</span>
+</footer>
+
+<!-- 导出菜单 -->
+<div class="popup" id="exportMenu">
+  <div class="popup-label">当前作品</div>
+  <button data-act="export-book-txt">导出全书 TXT</button>
+  <button data-act="export-book-md">导出全书 Markdown</button>
+  <button data-act="export-chapter-txt">导出本章 TXT</button>
+  <button data-act="export-chapter-md">导出本章 Markdown</button>
+  <div class="popup-sep"></div>
+  <div class="popup-label">全部作品</div>
+  <button data-act="export-all-txt">导出全部作品 TXT</button>
+  <button data-act="export-all-md">导出全部作品 Markdown</button>
+  <div class="popup-sep"></div>
+  <button data-act="backup">备份全部数据 (JSON)</button>
+  <button data-act="restore">从备份恢复…</button>
+</div>
+
+<!-- 专注模式退出条 -->
+<div class="focus-exit" id="focusExit">
+  <span>专注模式</span>
+  <button id="focusStopBtn">退出 (Esc)</button>
+</div>
+
+<!-- 设置抽屉 -->
+<div class="drawer-mask" id="drawerMask"></div>
+<div class="drawer" id="settingsDrawer">
+  <div class="drawer-head">
+    <h3>设置</h3>
+    <button class="icon-btn tiny" id="settingsClose">✕</button>
+  </div>
+  <div class="drawer-body">
+
+    <div class="set-group">
+      <label class="set-label">外观主题</label>
+      <div class="seg" id="setTheme">
+        <button data-v="paper">宣纸</button>
+        <button data-v="light">极简</button>
+        <button data-v="dark">夜间</button>
+      </div>
+    </div>
+
+    <div class="set-group">
+      <label class="set-label">正文字号 <b id="valFont">18</b> px</label>
+      <input type="range" id="setFont" min="14" max="26" step="1">
+    </div>
+
+    <div class="set-group">
+      <label class="set-label">行距 <b id="valLine">1.9</b></label>
+      <input type="range" id="setLine" min="1.4" max="2.6" step="0.1">
+    </div>
+
+    <div class="set-group">
+      <label class="set-label">正文字体</label>
+      <div class="seg" id="setFontFamily">
+        <button data-v="serif">衬线</button>
+        <button data-v="sans">黑体</button>
+        <button data-v="kai">楷体</button>
+      </div>
+    </div>
+
+    <div class="set-group">
+      <label class="set-label">编辑器宽度 <b id="valWidth">760</b> px</label>
+      <input type="range" id="setWidth" min="520" max="1100" step="20">
+    </div>
+
+    <div class="set-group">
+      <label class="set-label">每日码字目标 <b id="valGoal">2000</b> 字</label>
+      <input type="range" id="setGoal" min="500" max="20000" step="500">
+    </div>
+
+    <div class="set-group">
+      <label class="set-label">自动保存间隔 <b id="valAuto">0.8</b> 秒</label>
+      <input type="range" id="setAuto" min="0.3" max="5" step="0.1">
+    </div>
+
+    <div class="set-group">
+      <label class="set-check"><input type="checkbox" id="setIndent"> 首行缩进两字符</label>
+      <label class="set-check"><input type="checkbox" id="setTypewriter"> 打字机模式（光标居中）</label>
+      <label class="set-check"><input type="checkbox" id="setSnap"> 保留章节历史快照</label>
+    </div>
+
+    <div class="set-group">
+      <label class="set-label">数据位置</label>
+      <div class="data-path" id="dataPath">—</div>
+      <div class="tool-row">
+        <button class="mini-btn" id="btnOpenData">打开数据文件夹</button>
+        <button class="mini-btn" id="btnReloadData">重新载入</button>
+      </div>
+    </div>
+
+    <div class="set-group about">
+      <p>墨页 · 小说写作 v1.0.0</p>
+      <p class="muted">本地存储，不联网，数据完全属于你。</p>
+      <p class="muted" id="envInfo">运行环境：检测中…</p>
+    </div>
+  </div>
+</div>
+
+<!-- 历史版本抽屉 -->
+<div class="drawer" id="historyDrawer">
+  <div class="drawer-head">
+    <h3>历史版本</h3>
+    <button class="icon-btn tiny" id="historyClose">✕</button>
+  </div>
+  <div class="drawer-body" id="historyList"></div>
+</div>
+
+<!-- 素材编辑抽屉 -->
+<div class="drawer" id="noteDrawer">
+  <div class="drawer-head">
+    <input type="text" id="noteTitle" class="drawer-title" placeholder="素材标题">
+    <button class="icon-btn tiny" id="noteClose">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="set-group">
+      <label class="set-label">分类</label>
+      <div class="seg" id="noteCat">
+        <button data-v="character">人物</button>
+        <button data-v="world">设定</button>
+        <button data-v="plot">情节</button>
+        <button data-v="other">其他</button>
+      </div>
+    </div>
+    <textarea class="drawer-textarea" id="noteBody" placeholder="内容…" spellcheck="false"></textarea>
+  </div>
+  <div class="drawer-foot">
+    <button class="mini-btn danger" id="noteDelete">删除</button>
+    <span class="spacer"></span>
+    <button class="mini-btn primary" id="noteSave">保存</button>
+  </div>
+</div>
+
+<!-- 新建作品对话框 -->
+<div class="drawer dialog" id="bookDialog">
+  <div class="drawer-head">
+    <h3 id="bookDialogTitle">新建作品</h3>
+    <button class="icon-btn tiny" id="bookDialogClose">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="set-group">
+      <label class="set-label">书名</label>
+      <input type="text" id="bkTitle" class="text-input" placeholder="给作品起个名字">
+    </div>
+    <div class="set-group">
+      <label class="set-label">作者</label>
+      <input type="text" id="bkAuthor" class="text-input" placeholder="笔名">
+    </div>
+    <div class="set-group">
+      <label class="set-label">简介</label>
+      <textarea id="bkDesc" class="text-input" rows="4" placeholder="一句话介绍这个故事"></textarea>
+    </div>
+  </div>
+  <div class="drawer-foot">
+    <button class="mini-btn danger" id="bkDelete">删除此作品</button>
+    <span class="spacer"></span>
+    <button class="mini-btn primary" id="bkSave">保存</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- 启动错误浮层（默认隐藏，出错时由 app.js 显示） -->
+<div id="bootError" class="boot-error" hidden>
+  <div class="be-box">
+    <h2>墨页启动遇到问题</h2>
+    <pre id="bootErrorMsg"></pre>
+    <div id="bootErrorHint" class="muted"></div>
+  </div>
+</div>
+
+<script>
+/* 极早启动诊断脚本：比所有业务代码和 Neutralino 框架库都先执行，
+   用来捕获启动期白屏错误并显示在启动屏上，避免用户只能猜。 */
+(function(){
+  'use strict';
+  var splashText = document.getElementById('bootSplashText');
+  var splashErr = document.getElementById('bootSplashErr');
+  var splashHint = document.getElementById('bootSplashHint');
+  var logs = [];
+  function showEarly(msg, detail){
+    if (splashText) splashText.textContent = msg || '启动失败';
+    if (splashErr) { splashErr.hidden = false; splashErr.textContent = detail || ''; }
+    if (splashHint) splashHint.innerHTML = '请尝试：1) 确认 <b>墨页-win_x64.exe</b> 与 <b>resources.neu</b> 同目录；2) 右键 exe → 属性 → 勾选「解除锁定」；3) 按 F12 打开开发者工具查看控制台。';
+    try { console.error('[墨页启动]', msg, detail); } catch(e){}
+  }
+  function bootLog(msg){
+    logs.push(msg);
+    if (splashText) splashText.textContent = logs.slice(-4).join(' → ');
+    try { console.log('[墨页启动]', msg); } catch(e){}
+  }
+  window.__showEarlyError = showEarly;
+  window.__bootLog = bootLog;
+  window.__markBootDone = function(){ window.__moyeBootDone = true; };
+  window.addEventListener('error', function(e){
+    showEarly('页面脚本错误', (e.error && e.error.stack) || (e.message + (e.filename ? ' @ ' + e.filename + ':' + e.lineno : '')));
+  });
+  window.addEventListener('unhandledrejection', function(e){
+    var r = e.reason; showEarly('未处理的异步错误', (r && (r.stack || r.message)) || String(r));
+  });
+  // 若 6 秒内 UI 未接管，给出提示（防止无限白屏）
+  setTimeout(function(){
+    if (document.getElementById('bootSplash') && !window.__moyeBootDone) {
+      showEarly('启动未完成', 'UI 未能在预期时间内渲染。请按 F12 打开开发者工具，查看 Network / Console 里的红色报错并截图。');
+    }
+  }, 6000);
+})();
+</script>
+<script src="js/neutralino.js"></script>
+<script src="js/store.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
