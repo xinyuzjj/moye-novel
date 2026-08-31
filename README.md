@@ -2,7 +2,7 @@
 
 一款**纯本地、轻量、不联网**的小说写作桌面软件。单 exe 仅约 2.4MB，所有稿件数据都存在你电脑上的 `data/` 文件夹，随手可带走，不上传任何云端。
 
-![墨页](resources/icons/appIcon.png)
+![墨页](src/icons/appIcon.png)
 
 ## 特性
 
