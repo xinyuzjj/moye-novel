@@ -92,6 +92,29 @@ function buildDom(dataDir) {
   ok('二次启动从磁盘读回改过的书名（数据持久化成立）', reloaded && reloaded.books[0].title === '改过的书名');
   dom2.window.close();
 
+  // 第三阶段：人物卡片功能（端到端模拟界面操作）
+  const dom3 = buildDom(dataDir);
+  await wait(1600);
+  const w3 = dom3.window, doc3 = w3.document;
+  const charTab = [...doc3.querySelectorAll('.outline-tab')].find((t) => t.dataset.tab === 'character');
+  charTab.dispatchEvent(new w3.MouseEvent('click', { bubbles: true }));
+  doc3.getElementById('btnNewCard').dispatchEvent(new w3.MouseEvent('click', { bubbles: true }));
+  doc3.getElementById('cardName').value = '林惊羽';
+  doc3.getElementById('cardMeta').value = '男主';
+  doc3.getElementById('cardDesc').value = '外表冷峻，内心温柔。';
+  doc3.getElementById('cardTags').value = '冷酷, 背负仇恨';
+  doc3.getElementById('cardSave').dispatchEvent(new w3.MouseEvent('click', { bubbles: true }));
+  await wait(1600); // 等自动保存落盘
+  const card = doc3.querySelector('#cardList .info-card');
+  ok('人物卡片已渲染到资料栏列表', !!card);
+  ok('卡片显示姓名', card && card.querySelector('.ic-name').textContent === '林惊羽');
+  ok('卡片显示身份标签', card && card.querySelector('.ic-meta') && card.querySelector('.ic-meta').textContent === '男主');
+  const persistedCards = fsstore.loadNovels(dataDir);
+  ok('人物卡片已持久化到磁盘', persistedCards.books[0].cards.character.length === 1 &&
+    persistedCards.books[0].cards.character[0].name === '林惊羽' &&
+    persistedCards.books[0].cards.character[0].tags.join() === '冷酷,背负仇恨');
+  dom3.window.close();
+
   try { fs.rmSync(dataDir, { recursive: true, force: true }); } catch (e) {}
   console.log('\n结果：' + pass + ' 通过 / ' + fail + ' 失败');
   process.exitCode = fail ? 1 : 0;

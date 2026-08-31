@@ -33,8 +33,8 @@
     sans: '"PingFang SC","Microsoft YaHei UI","Hiragino Sans GB",sans-serif',
     kai: '"Kaiti SC","KaiTi","STKaiti","Songti SC",serif'
   };
-  const STATUS_TEXT = { draft: '草稿', writing: '写作中', done: '已完成' };
   const NOTE_CAT = { character: '人物', world: '设定', plot: '情节', other: '其他' };
+  const CARD_TAB_NAME = { character: '人物', world: '设定', idea: '灵感' };
 
   let db = null, S = null, curChapterId = null, editor = null;
   let saveTimer = null, dirty = false, saving = false;
@@ -102,8 +102,9 @@
     const cid = uid();
     return {
       id: uid(), title: name || '我的小说', author: '', desc: '',
-      volumes: [{ id: uid(), name: '正文', collapsed: false, chapters: [{ id: cid, title: '第一章', status: 'draft', html: '', words: 0, updatedAt: Date.now(), snapshots: [] }] }],
+      volumes: [{ id: uid(), name: '正文', collapsed: false, chapters: [{ id: cid, title: '第一章', html: '', words: 0, updatedAt: Date.now(), snapshots: [] }] }],
       notes: [], outline: { outline: '', character: '', world: '', idea: '' },
+      cards: { character: [], world: [], idea: [] },
       settings: Object.assign({}, DEFAULT_SETTINGS), today: { date: dateKey(new Date()), words: 0 }, history: {}
     };
   }
@@ -114,6 +115,14 @@
       b.volumes = b.volumes || [];
       b.notes = b.notes || [];
       b.outline = b.outline || { outline: '', character: '', world: '', idea: '' };
+      b.cards = b.cards || { character: [], world: [], idea: [] };
+      ['character', 'world', 'idea'].forEach((k) => {
+        b.cards[k] = Array.isArray(b.cards[k]) ? b.cards[k] : [];
+        // 旧版：这些 tab 是纯文本，升级时迁移成一张卡片，避免丢数据
+        const oldText = b.outline[k];
+        if (oldText && !b.cards[k].length) b.cards[k].push({ id: uid(), name: '', meta: '', desc: oldText, tags: [] });
+        b.cards[k].forEach((c) => { c.id = c.id || uid(); c.tags = Array.isArray(c.tags) ? c.tags : []; });
+      });
       b.settings = Object.assign({}, DEFAULT_SETTINGS, b.settings || {});
       b.volumes.forEach((v) => { v.chapters = v.chapters || []; v.chapters.forEach((c) => { c.snapshots = c.snapshots || []; }); });
       if (!b.today) b.today = { date: dateKey(new Date()), words: 0 };
@@ -226,7 +235,6 @@
     curChapterId = id;
     editor.innerHTML = f.ch.html || '';
     $('#chapterTitle').value = f.ch.title || '';
-    $('#chapterStatus').value = f.ch.status || 'draft';
     markNonEmpty();
     highlightTOC();
     const st = $('#stChapter'); if (st) st.textContent = (f.vol.name ? f.vol.name + ' / ' : '') + (f.ch.title || '未命名');
@@ -236,7 +244,7 @@
     const b = activeBook();
     let vol = b.volumes[b.volumes.length - 1];
     if (!vol) { vol = { id: uid(), name: '正文', collapsed: false, chapters: [] }; b.volumes.push(vol); }
-    const c = { id: uid(), title: '新章节', status: 'draft', html: '', words: 0, updatedAt: Date.now(), snapshots: [] };
+    const c = { id: uid(), title: '新章节', html: '', words: 0, updatedAt: Date.now(), snapshots: [] };
     vol.chapters.push(c);
     renderTOC(); selectChapter(c.id); scheduleSave(); updateGoal();
     const t = $('#chapterTitle'); if (t) { t.focus(); t.select(); }
@@ -380,17 +388,106 @@
       '<div class="stat-block"><h4>今日进度</h4><div>已写 ' + (db.today ? db.today.words : 0) + ' / ' + goal + ' 字</div></div>';
   }
 
-  /* ───────── 资料栏 ───────── */
-  function renderOutline() {
-    const ta = $('#outlineBody'); if (!ta) return;
-    ta.value = activeBook().outline[outlineTab] || '';
-    const c = $('#outlineCount'); if (c) c.textContent = countWords(ta.value) + ' 字';
+  /* ───────── 资料栏（大纲文本 + 人物/设定/灵感 卡片） ───────── */
+  function currentCardArr() { return (activeBook().cards && activeBook().cards[outlineTab]) || []; }
+
+  function renderOutlinePanel() {
+    const ta = $('#outlineBody'), area = $('#cardArea');
+    if (!ta || !area) return;
+    if (outlineTab === 'outline') {
+      ta.hidden = false; area.hidden = true;
+      ta.value = activeBook().outline.outline || '';
+    } else {
+      ta.hidden = true; area.hidden = false;
+      renderCards();
+    }
+    updateOutlineCount();
   }
-  function syncOutline() {
+  function onOutlineInput() {
     const ta = $('#outlineBody'); if (!ta) return;
-    activeBook().outline[outlineTab] = ta.value;
-    const c = $('#outlineCount'); if (c) c.textContent = countWords(ta.value) + ' 字';
-    scheduleSave();
+    activeBook().outline.outline = ta.value;
+    updateOutlineCount(); scheduleSave();
+  }
+  function updateOutlineCount() {
+    const c = $('#outlineCount'); if (!c) return;
+    if (outlineTab === 'outline') c.textContent = countWords($('#outlineBody').value) + ' 字';
+    else c.textContent = currentCardArr().length + ' 张卡片';
+  }
+
+  function renderCards() {
+    const list = $('#cardList'); if (!list) return;
+    const arr = currentCardArr();
+    list.innerHTML = '';
+    if (!arr.length) {
+      list.innerHTML = '<div class="empty-tip">还没有' + (CARD_TAB_NAME[outlineTab] || '卡片') + '<br>点上方「＋ 新建卡片」添加</div>';
+      return;
+    }
+    arr.forEach((c) => {
+      const el = document.createElement('div'); el.className = 'info-card'; el.dataset.id = c.id;
+      const metaHtml = c.meta ? '<span class="ic-meta">' + esc(c.meta) + '</span>' : '';
+      const tagsHtml = (c.tags && c.tags.length)
+        ? '<div class="ic-tags">' + c.tags.map((t) => '<span class="tag">' + esc(t) + '</span>').join('') + '</div>' : '';
+      el.innerHTML =
+        '<div class="ic-top"><span class="ic-name">' + esc(c.name || '未命名') + '</span>' +
+        '<button class="ic-del" data-act="del" title="删除">✕</button></div>' +
+        (metaHtml ? '<div class="ic-meta-row">' + metaHtml + '</div>' : '') +
+        (c.desc ? '<div class="ic-desc">' + esc(c.desc) + '</div>' : '') +
+        tagsHtml;
+      list.appendChild(el);
+    });
+  }
+
+  let editingCardId = null;
+  function openCardEditor(id) {
+    const tab = outlineTab;
+    const labels = {
+      character: { name: '人物姓名', metaLabel: '身份 / 角色', metaPh: '如：男主、反派、配角' },
+      world: { name: '设定名称', metaLabel: '类别', metaPh: '如：世界观、门派、道具' },
+      idea: { name: '灵感标题', metaLabel: '来源 / 触发', metaPh: '如：一段对话、一个画面' }
+    }[tab] || { name: '名称', metaLabel: '标签', metaPh: '' };
+    $('#cardName').placeholder = labels.name;
+    $('#cardMetaLabel').textContent = labels.metaLabel;
+    $('#cardMeta').placeholder = labels.metaPh;
+    const arr = currentCardArr();
+    const c = id ? arr.find((x) => x.id === id) : null;
+    if (c) {
+      editingCardId = c.id;
+      $('#cardName').value = c.name || '';
+      $('#cardMeta').value = c.meta || '';
+      $('#cardTags').value = (c.tags || []).join(', ');
+      $('#cardDesc').value = c.desc || '';
+      $('#cardDelete').style.display = '';
+    } else {
+      editingCardId = null;
+      $('#cardName').value = ''; $('#cardMeta').value = ''; $('#cardTags').value = ''; $('#cardDesc').value = '';
+      $('#cardDelete').style.display = 'none';
+    }
+    openDrawer('cardDrawer');
+  }
+  function saveCard() {
+    const name = $('#cardName').value.trim();
+    const meta = $('#cardMeta').value.trim();
+    const desc = $('#cardDesc').value;
+    const tags = $('#cardTags').value.split(/[,，]/).map((s) => s.trim()).filter(Boolean);
+    const arr = currentCardArr();
+    if (!editingCardId) {
+      if (!name && !meta && !desc.trim()) { closeDrawer('cardDrawer'); return; }
+      arr.push({ id: uid(), name, meta, desc, tags });
+    } else {
+      const c = arr.find((x) => x.id === editingCardId);
+      if (c) { c.name = name; c.meta = meta; c.desc = desc; c.tags = tags; }
+    }
+    renderCards(); updateOutlineCount(); closeDrawer('cardDrawer'); scheduleSave();
+  }
+  function deleteCardById(id) {
+    const arr = currentCardArr();
+    const i = arr.findIndex((x) => x.id === id);
+    if (i >= 0) arr.splice(i, 1);
+    renderCards(); updateOutlineCount(); scheduleSave();
+  }
+  function deleteCard() {
+    if (editingCardId) deleteCardById(editingCardId);
+    closeDrawer('cardDrawer');
   }
 
   /* ───────── 历史快照 ───────── */
@@ -655,7 +752,7 @@
   }
 
   function renderAll() {
-    renderBookSwitch(); renderTOC(); renderNotes(); renderStats(); renderOutline();
+    renderBookSwitch(); renderTOC(); renderNotes(); renderStats(); renderOutlinePanel();
     const first = allChapters()[0]; if (first && !curChapterId) selectChapter(first.id);
     updateGoal();
   }
@@ -721,16 +818,27 @@
     $('#chapterTitle').addEventListener('input', (e) => {
       const f = findChapter(curChapterId); if (f) { f.ch.title = e.target.value; renderTOC(); highlightTOC(); const st = $('#stChapter'); if (st) st.textContent = (f.vol.name ? f.vol.name + ' / ' : '') + (f.ch.title || '未命名'); scheduleSave(); }
     });
-    $('#chapterStatus').addEventListener('change', (e) => { const f = findChapter(curChapterId); if (f) { f.ch.status = e.target.value; scheduleSave(); } });
     $('#btnDelChapter').addEventListener('click', () => { if (curChapterId) deleteChapter(curChapterId); });
     $('#btnHistory').addEventListener('click', () => { renderHistory(); openDrawer('historyDrawer'); });
 
     // 资料栏
     $$('.outline-tab').forEach((t) => t.addEventListener('click', () => {
+      if (outlineTab === 'outline') onOutlineInput(); // 切走前先保存大纲文本
       $$('.outline-tab').forEach((x) => x.classList.toggle('active', x === t));
-      outlineTab = t.dataset.tab; renderOutline();
+      outlineTab = t.dataset.tab; renderOutlinePanel();
     }));
-    $('#outlineBody').addEventListener('input', syncOutline);
+    $('#outlineBody').addEventListener('input', onOutlineInput);
+
+    // 卡片（人物/设定/灵感）
+    $('#btnNewCard').addEventListener('click', () => openCardEditor(null));
+    $('#cardList').addEventListener('click', (e) => {
+      const del = e.target.closest('.ic-del');
+      if (del) { const id = del.closest('.info-card').dataset.id; deleteCardById(id); return; }
+      const card = e.target.closest('.info-card'); if (card) openCardEditor(card.dataset.id);
+    });
+    $('#cardSave').addEventListener('click', saveCard);
+    $('#cardClose').addEventListener('click', () => closeDrawer('cardDrawer'));
+    $('#cardDelete').addEventListener('click', deleteCard);
 
     // 查找
     $('#btnFind') && $('#btnFind').addEventListener('click', () => $('#findBar').classList.add('show'));
