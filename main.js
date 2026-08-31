@@ -1,6 +1,6 @@
 /* ===== 墨页 · Electron 主进程 ===== */
 'use strict';
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
 const path = require('path');
 const fsstore = require('./lib/fsstore');
 
@@ -33,6 +33,8 @@ function createWindow() {
     backgroundColor: '#f3efe6',
     icon: path.join(__dirname, 'resources', 'icons', 'appIcon.png'),
     autoHideMenuBar: true,
+    frame: false,
+    titleBarStyle: 'hidden',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -48,6 +50,20 @@ function createWindow() {
 }
 
 function registerIpc() {
+  // 窗口控制
+  ipcMain.handle('window-control', (e, action) => {
+    if (!mainWin) return false;
+    switch (action) {
+      case 'minimize': mainWin.minimize(); return true;
+      case 'maximize':
+        if (mainWin.isMaximized()) mainWin.unmaximize(); else mainWin.maximize();
+        return mainWin.isMaximized();
+      case 'close': mainWin.close(); return true;
+      case 'is-maximized': return mainWin.isMaximized();
+    }
+    return false;
+  });
+
   ipcMain.handle('get-version', () => app.getVersion());
   ipcMain.handle('get-data-path', () => dataDir);
 
@@ -92,10 +108,15 @@ function registerIpc() {
 }
 
 app.whenReady().then(() => {
+  Menu.setApplicationMenu(null);
   dataDir = resolveDataDir();
   console.log('[墨页] 数据目录：' + dataDir);
   registerIpc();
   createWindow();
+
+  // 窗口最大化/还原时通知渲染进程更新按钮图标
+  mainWin.on('maximize', () => { try { mainWin.webContents.send('window-state', 'maximized'); } catch (e) {} });
+  mainWin.on('unmaximize', () => { try { mainWin.webContents.send('window-state', 'restored'); } catch (e) {} });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

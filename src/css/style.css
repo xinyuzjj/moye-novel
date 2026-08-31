@@ -68,6 +68,37 @@ body {
 b { font-weight: 600; }
 button { font-family: inherit; cursor: pointer; }
 
+/* 自定义标题栏（Electron frameless 窗口） */
+.titlebar {
+  height: 34px; flex: 0 0 34px;
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--bar);
+  border-bottom: 1px solid var(--line);
+  -webkit-app-region: drag;
+  app-region: drag;
+  user-select: none;
+  z-index: 100;
+}
+.titlebar-drag {
+  display: flex; align-items: center; gap: 8px;
+  height: 100%; padding: 0 12px;
+  -webkit-app-region: drag; app-region: drag;
+}
+.titlebar-icon { width: 18px; height: 18px; border-radius: 4px; opacity: .92; }
+.titlebar-text { font-size: 13px; color: var(--ink-soft); letter-spacing: .5px; }
+.titlebar-btns { display: flex; align-items: center; height: 100%; -webkit-app-region: no-drag; app-region: no-drag; }
+.tb-btn {
+  width: 46px; height: 100%;
+  background: transparent; border: none; border-radius: 0;
+  color: var(--ink-soft); font-size: 16px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s, color .15s;
+}
+.tb-btn:hover { background: rgba(0,0,0,.06); color: var(--ink); }
+.tb-btn.tb-close:hover { background: var(--danger); color: #fff; }
+[data-theme="dark"] .tb-btn:hover { background: rgba(255,255,255,.08); }
+[data-theme="dark"] .tb-btn.tb-close:hover { background: var(--danger); }
+
 /* 顶栏 */
 .topbar {
   height: 48px; flex: 0 0 48px;

@@ -794,6 +794,29 @@
     } catch (e) {}
   }
 
+  /* ───────── 自定义标题栏（Electron frameless 窗口控制按钮） ───────── */
+  function initTitleBar() {
+    if (!window.electronAPI || !window.electronAPI.windowControl) return;
+    const minBtn = $('#tbMin'), maxBtn = $('#tbMax'), closeBtn = $('#tbClose');
+    if (!minBtn || !maxBtn || !closeBtn) return;
+
+    minBtn.addEventListener('click', () => window.electronAPI.windowControl('minimize'));
+    maxBtn.addEventListener('click', async () => {
+      const maximized = await window.electronAPI.windowControl('maximize');
+      maxBtn.innerHTML = maximized ? '❐' : '□';
+      maxBtn.title = maximized ? '还原' : '最大化';
+    });
+    closeBtn.addEventListener('click', () => window.electronAPI.windowControl('close'));
+
+    if (window.electronAPI.onWindowState) {
+      window.electronAPI.onWindowState((state) => {
+        const isMax = state === 'maximized';
+        maxBtn.innerHTML = isMax ? '❐' : '□';
+        maxBtn.title = isMax ? '还原' : '最大化';
+      });
+    }
+  }
+
   /* ───────── 桌面初始化 ───────── */
   function initDesktop() {
     // Electron：自动保存已覆盖持久化。额外在窗口失焦/隐藏时补一次保存，
@@ -854,6 +877,7 @@
   document.addEventListener('DOMContentLoaded', () => {
     installErrorReporter();
     editor = $('#editor');
+    initTitleBar();
     initDesktop();
     boot().then(() => {
       clearTimeout(bootInsurance);

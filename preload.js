@@ -12,5 +12,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveNovels: (db) => ipcRenderer.invoke('save-novels', db),
   exportFile: (opts) => ipcRenderer.invoke('export-file', opts),
   importFile: (opts) => ipcRenderer.invoke('import-file', opts),
-  openDataFolder: () => ipcRenderer.invoke('open-data-folder')
+  openDataFolder: () => ipcRenderer.invoke('open-data-folder'),
+  windowControl: (action) => ipcRenderer.invoke('window-control', action),
+  onWindowState: (cb) => ipcRenderer.on('window-state', (_e, state) => cb(state))
 });
