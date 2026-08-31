@@ -24,10 +24,11 @@ function resolveDataDir() {
   return candidates[1];
 }
 
-/* 用户插件目录：默认放在 userData/plugins（AppData 内，永远可写，即插即用最稳）。
- * 同时扫描 exe 同级 plugins/（便携版解压即用）。两者都算「用户插件」。 */
+/* 用户插件目录：默认放在「安装位置 / plugins」下（exe 同级），即插即用最直观。
+ * 安装到 Program Files 没写权限时，额外扫描 userData/plugins（AppData）作为兜底，两者都算用户插件。
+ * 「打开插件文件夹」按钮打开安装位置的 plugins/ 目录。 */
 function resolveUserPluginsDir() {
-  return path.join(app.getPath('userData'), 'plugins');
+  return path.join(path.dirname(app.getPath('exe')), 'plugins');
 }
 
 /* 发现插件：
@@ -69,10 +70,10 @@ function scanPlugins() {
     } catch (e) { console.error('[墨页] 扫描内置插件目录失败', e); }
   }
 
-  // 用户插件目录
+  // 用户插件目录：安装位置 plugins/ 优先，AppData/plugins 兜底（Program Files 无写权限时仍可即插即用）
   const roots = [
     { dir: userPluginsDir },
-    { dir: path.join(path.dirname(app.getPath('exe')), 'plugins') }
+    { dir: path.join(app.getPath('userData'), 'plugins') }
   ];
   for (const r of roots) {
     if (!r.dir || !fs.existsSync(r.dir)) continue;
@@ -189,10 +190,13 @@ function registerIpc() {
     catch (e) { console.error('[墨页] get-plugins 失败', e); return []; }
   });
 
-  // 插件：打开用户插件目录（不存在则创建）
+  // 插件：打开用户插件目录（安装位置下的 plugins/，不存在则尝试创建）
   ipcMain.handle('open-plugins-folder', () => {
-    try { fsstore.ensureDir(userPluginsDir); shell.openPath(userPluginsDir); return true; }
-    catch (e) { return false; }
+    try {
+      try { fsstore.ensureDir(userPluginsDir); } catch (e) { /* 安装位置无写权限时跳过创建，目录通常已随安装包存在 */ }
+      shell.openPath(userPluginsDir);
+      return true;
+    } catch (e) { return false; }
   });
 
   // 插件：在 data 目录内的沙箱文件读写（防目录穿越）

@@ -31,6 +31,9 @@
       "buildResources": "resources"
     },
     "electronDist": ".electron-dist",
+    "extraFiles": [
+      { "from": "plugins", "to": "plugins" }
+    ],
     "publish": null,
     "win": {
       "target": ["nsis"],
