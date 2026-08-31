@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '1.2.3';
+  const APP_VERSION = '2.0.0';
 
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
@@ -47,12 +47,10 @@
     const overlay = $('#bootError'), msgEl = $('#bootErrorMsg'), hintEl = $('#bootErrorHint');
     const splash = $('#bootSplash'), splashText = $('#bootSplashText'), splashErr = $('#bootSplashErr'), splashHint = $('#bootSplashHint');
     function writeHint(nl, mode) {
-      return '运行环境：' + (nl ? 'Neutralino 已加载' : 'Neutralino 未加载') + '（mode=' + mode + '）<br><br>' +
-        '请依次排查：<br>1) 确认 <b>墨页-win_x64.exe</b> 与 <b>resources.neu</b> 在同一文件夹；<br>' +
-        '2) 若被系统拦截：右键 exe → 属性 → 勾选「解除锁定」→ 再运行；<br>' +
-        '3) 确认已安装 <b>Microsoft Edge WebView2 Runtime</b>；<br>' +
-        '4) 按 <b>F12</b> 打开开发者工具，查看 Console 里的红色报错；<br>' +
-        '5) 本软件需通过 exe 启动，不能直接用浏览器打开 index.html。';
+      return '运行环境：Electron（mode=' + mode + '）<br><br>' +
+        '若界面未能渲染，请尝试：<br>1) 重新从官网下载并运行 <b>墨页-setup.exe</b> 安装；<br>' +
+        '2) 若被杀软拦截：把安装目录加入白名单后重试；<br>' +
+        '3) 按 <b>F12</b> 打开开发者工具，查看 Console 里的红色报错并截图反馈。';
     }
     function showOnSplash(title, detail) {
       if (splashText) splashText.textContent = title || '启动失败';
@@ -79,8 +77,9 @@
       const r = e.reason; window.__showBootError('未处理的异步错误', (r && (r.stack || r.message)) || String(r));
     });
     setTimeout(() => {
-      if (!window.__moyeBootDone && typeof Neutralino === 'undefined' && !window.NL_MODE) {
-        window.__showBootError('未检测到本地运行环境', '页面里没有 Neutralino 全局对象，可能是 resources.neu 损坏或脚本未加载。请重新用「墨页-win_x64.exe」启动。');
+      // Electron 下 window.electronAPI 一定存在；只有既不是 Electron、也不是 Neutralino、也没 NL_MODE 时才算真缺环境
+      if (!window.__moyeBootDone && !window.electronAPI && typeof Neutralino === 'undefined' && !window.NL_MODE) {
+        window.__showBootError('未检测到本地运行环境', '本软件需通过「墨页-setup.exe」安装后用桌面快捷方式启动，不能直接用浏览器打开 index.html。');
       }
     }, 3000);
   }
@@ -754,9 +753,8 @@
     $('#btnOpenData').addEventListener('click', async () => { if (!await Store.openDataFolder()) toast('当前为浏览器模式，数据存在 IndexedDB'); });
     $('#btnReloadData').addEventListener('click', async () => { const data = await Store.load(); if (data) { db = normalize(data); S = activeBook().settings; applySettings(); renderAll(); toast('已重新载入'); } });
     try {
-      const inNL = (typeof Neutralino !== 'undefined');
-      const mode = (typeof NL_MODE !== 'undefined' && NL_MODE) || (window.NL_MODE || (inNL ? 'window' : 'browser'));
-      const envEl = $('#envInfo'); if (envEl) envEl.textContent = '运行环境：' + (inNL ? 'Neutralino' : '浏览器') + ' · mode=' + mode;
+      const inEl = (typeof window !== 'undefined' && window.electronAPI);
+      const envEl = $('#envInfo'); if (envEl) envEl.textContent = '运行环境：' + (inEl ? 'Electron 桌面端' : '浏览器');
     } catch (e) {}
 
     // 作品对话框
@@ -798,26 +796,23 @@
 
   /* ───────── 桌面初始化 ───────── */
   function initDesktop() {
-    if (typeof Neutralino !== 'undefined') {
-      // Neutralino v6.9.0 客户端库在加载 globals 脚本后已自动完成初始化，
-      // 不再需要调用 Neutralino.init()（该 API 已不存在）。
-      try {
-        Neutralino.events.on('windowClose', async () => {
-          try { flushChapter(); await saveNow(); } catch (e) {}
-          try { Neutralino.app.exit(); } catch (e) {}
-        });
-      } catch (e) {
-        if (window.__showBootError) window.__showBootError('窗口事件注册失败', (e && (e.stack || e.message)) || String(e));
-      }
-    }
+    // Electron：自动保存已覆盖持久化。额外在窗口失焦/隐藏时补一次保存，
+    // 最大化避免「关太快没存上」的极端情况。
+    try {
+      const flush = () => { try { if (db) window.electronAPI && window.electronAPI.saveNovels(db); } catch (e) {} };
+      window.addEventListener('pagehide', flush);
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
+      window.addEventListener('blur', flush);
+    } catch (e) {}
   }
 
   /* ───────── 启动 ───────── */
   async function boot() {
     bootLog('检查运行环境');
+    const inEl = (typeof window !== 'undefined' && window.electronAPI);
     const nl = (typeof Neutralino !== 'undefined');
-    const mode = (typeof NL_MODE !== 'undefined' && NL_MODE) || (window.NL_MODE || 'browser');
-    bootLog('运行环境 ' + (nl ? 'Neutralino' : '浏览器') + ' / ' + mode);
+    const mode = inEl ? 'electron' : (nl ? 'window' : 'browser');
+    bootLog('运行环境 ' + (inEl ? 'Electron' : (nl ? 'Neutralino' : '浏览器')) + ' / ' + mode);
 
     bootLog('加载本地数据');
     // 原生存储加载加超时兜底：若 Neutralino 连接异常导致 API 调用永久挂起，

@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build:
-    name: Build Windows exe
+    name: Build Windows installer
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -22,45 +22,20 @@ jobs:
           node-version: '22'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
-      # Neutralino 运行时二进制（v6.9.0）不入库（被 .gitignore 忽略），
-      # 构建前先下载并放到 bin/，neu build 会直接使用它，不再联网拉取。
-      - name: Download Neutralino binary v6.9.0
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $zip = "neutralino.zip"
-          Invoke-WebRequest -Uri "https://github.com/neutralinojs/neutralinojs/releases/download/v6.9.0/neutralinojs-v6.9.0.zip" -OutFile $zip
-          Expand-Archive -Path $zip -DestinationPath neu_tmp -Force
-          New-Item -ItemType Directory -Force -Path bin | Out-Null
-          Copy-Item -Path neu_tmp\neutralino-win_x64.exe -Destination bin\ -Force
-          if (Test-Path neu_tmp\webview) { Copy-Item -Path neu_tmp\webview -Destination bin\ -Recurse -Force }
-          Remove-Item $zip, neu_tmp -Recurse -Force
+      - name: Prepare local electron dist for packaging
+        run: Copy-Item -Recurse -Force node_modules/electron/dist .electron-dist
 
-      - name: Build (inline + neu build + verify)
-        run: node build.mjs
+      - name: Build installer (electron-builder)
+        run: npm run dist
 
-      # 用 Inno Setup 把 exe + resources.neu 打包成标准安装包（含开始菜单/桌面快捷方式、卸载程序）
-      - name: Install Inno Setup
-        run: choco install innosetup -y --no-progress
-
-      - name: Build installer (墨页-setup.exe)
-        shell: pwsh
-        run: |
-          $iscc = (Get-Command ISCC -ErrorAction SilentlyContinue).Source
-          if (-not $iscc) { $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" }
-          & $iscc installer.iss
-          if (-not (Test-Path "dist\墨页-setup.exe")) { throw "安装包未生成" }
-
-      # GitHub Release 资产名不支持非 ASCII，这里复制成规范 ASCII 文件名再上传
-      - name: Prepare Release assets (ASCII names)
+      - name: Prepare Release assets
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path release | Out-Null
-          Copy-Item "dist\墨页\墨页-win_x64.exe" "release\moye-novel-win_x64.exe"
-          Copy-Item "dist\墨页\resources.neu"    "release\resources.neu"
-          Copy-Item "dist\墨页-setup.exe"        "release\moye-novel-setup.exe"
+          $setup = (Get-ChildItem dist-electron -Filter "moye-novel-setup-*.exe" | Select-Object -First 1).FullName
+          Copy-Item $setup "release\moye-novel-setup.exe"
 
       - name: Upload Release assets
         uses: softprops/action-gh-release@v2
@@ -69,21 +44,22 @@ jobs:
           body: |
             ## 墨页 · 本地轻量小说写作软件 ${{ github.ref_name }}
 
-            ### 推荐：一键安装
+            基于 **Electron** 重写，原生文件系统读写，数据存到 `AppData\墨页\data`（永远可写），
+            彻底解决旧版「装在 Program Files 后数据写不进」的问题。
+
+            ### 一键安装（推荐）
             - 下载 `moye-novel-setup.exe`，双击运行，按向导安装
             - 安装后可从**开始菜单 / 桌面快捷方式**启动，并自带卸载程序
             - 若被 SmartScreen 拦截，点“更多信息”→“仍要运行”即可（本软件未做代码签名，属正常现象）
 
-            ### 或：便携版（免安装）
-            - 下载 `moye-novel-win_x64.exe` 与 `resources.neu`，放在**同一文件夹**
-            - 双击 `墨页-win_x64.exe` 运行（或双击 `launch.bat`）
-            - 稿件数据保存在 exe 同级的 `data/novels.json`，整包可随身携带
-
             ### 特性
-            纯本地、不联网、单 exe 仅约 2.4MB；分卷/章节管理、自动保存、实时字数统计、每日码字目标与进度、写作热力图、大纲/人物/设定/灵感资料栏、素材卡片、查找替换、历史快照、专注模式、三种主题、TXT / Markdown 导出与备份。
+            纯本地、不联网；分卷/章节管理、自动保存、实时字数统计、每日码字目标与进度、写作热力图、大纲/人物/设定/灵感资料栏、素材卡片、查找替换、历史快照、专注模式、三种主题、TXT / Markdown 导出与备份。
+
+            ### 数据位置
+            - 优先：`exe 同级 data/`（便携版/解压即用，整包可带走）
+            - 兜底：`%APPDATA%\墨页\data`（安装到系统目录时自动使用，永远可写）
+            - 设置里点「打开数据文件夹」可直接打开。
           files: |
             release/moye-novel-setup.exe
-            release/moye-novel-win_x64.exe
-            release/resources.neu
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,14 +1,14 @@
 # 墨页 · 本地小说写作软件
 
-一款**纯本地、轻量、不联网**的小说写作桌面软件。单 exe 仅约 2.4MB，所有稿件数据都存在你电脑上的 `data/` 文件夹，随手可带走，不上传任何云端。
+一款**纯本地、轻量、不联网**的小说写作桌面软件。基于 **Electron** 构建，所有稿件数据都存在你电脑上，不上传任何云端。
 
 ![墨页主界面](docs/screenshot.png)
 
-**作者：峻峻尼 · 版本：v1.2.2 · 开源协议：MIT**
+**作者：峻峻尼 · 版本：v2.0.0 · 开源协议：MIT**
 
 ## 特性
 
-- **轻量桌面应用**：基于 [Neutralinojs](https://neutralino.js.org/) 封装，调用系统 WebView2 渲染，无需打包浏览器内核，安装包极小。
+- **桌面应用（Electron）**：自带 Chromium 渲染，文件读写走原生 `fs`，不依赖系统 WebView2，也不存在桥接 API 的签名坑。数据稳定落盘。
 - **分卷 / 章节管理**：多作品、多分卷、多章节，支持拖拽排序，结构一目了然。
 - **自动保存**：编辑即存（0.3~5s 可调），刷新、关机都不丢稿。
 - **实时字数统计**：当前章节字数、全书总字数、今日码字目标与进度条。
@@ -19,7 +19,7 @@
 - **历史快照**：每 5 分钟自动留存一份快照（保留最近 30 个），可回退。
 - **专注模式**：F11 一键沉浸写作。
 - **多种导出**：全书 / 本章的 TXT、Markdown（保留粗体 / 斜体 / 标题层级），以及全部作品合并导出；JSON 备份与恢复。
-- **三种主题**：宣纸 / 极简 / 夜间，护眼克制，不炫酷。
+- **三种主题**：宣纸 / 极简 / 夜间，护眼克制。
 
 ## 快速开始
 
@@ -31,51 +31,41 @@
 
 > 若被 Windows SmartScreen 拦截，点“更多信息”→“仍要运行”即可。本软件未做代码签名，属正常现象，不影响使用。
 
-### 便携版（免安装）
+### 数据存放位置
 
-1. 到 [Releases](../../releases) 下载 `moye-novel-win_x64.exe` 与同目录的 `resources.neu`。
-2. 把 `墨页-win_x64.exe` 和 `resources.neu` 放在**同一个文件夹**里，双击 exe 即可。
-3. 也可双击同目录的 `launch.bat` 启动（会先校验两个文件是否齐全）。
+- **优先**：程序所在目录的 `data/novels.json`（便携版 / 解压即用，整包拷到任意电脑、U 盘都能带着稿子走）。
+- **兜底**：若该目录不可写（例如装到 `C:\Program Files`），自动改存到 `%APPDATA%\墨页\data\novs.json`（永远可写）。
+- 想直接打开数据文件夹，可在「设置 → 数据位置」点「打开数据文件夹」。
 
-> **数据存放位置**：优先保存在程序所在目录的 `data/novels.json`（便携，整包拷到任意电脑、U 盘都能带着稿子走）；若该目录不可写，则自动改存到「文档 / 墨页小说写作 / data / novels.json」。想直接打开数据文件夹，可在设置里点「打开数据文件夹」。
+## 从源码构建
 
-### 从源码构建
-
-环境要求：Node.js 18+，以及系统已安装 Microsoft Edge WebView2 Runtime（Windows 10/11 通常自带）。
+环境要求：Node.js 18+。
 
 ```bash
-npm install          # 安装构建工具链（@neutralinojs/neu / @electron/asar / jsdom）
-node build.mjs       # 单文件内联 + 打包 + 自动解包校验
+npm install          # 安装 electron / electron-builder / jsdom
+npm test             # 运行文件层真实单测 + 渲染端集成冒烟
+npm run dist         # electron-builder 打包出安装包
 ```
 
-构建完成后成品在 `dist/墨页/`：`墨页-win_x64.exe` + `resources.neu`。
+构建完成后安装包在 `dist-electron/moye-novel-setup-<版本>.exe`。
 
-构建脚本 `build.mjs` 会依次做：
-
-1. 对三个 JS 做语法检查；
-2. 把 `css / store.js / app.js` **内联进单个 `index.html`**，从根上避免资源缺失类启动失败；
-3. `neu build --release` 打包；
-4. 解包校验：单文件 html 含全部逻辑、无 css/js 碎片、体积合理。
-
-任何一步失败都会直接报错退出、绝不产出坏包。
+本地开发预览：`npm start`（以 Electron 开发模式启动）。
 
 ## 目录结构
 
 ```
 墨页/
-├─ src/                  # 开发态前端源码（模块化）
+├─ src/                  # 前端源码（主进程加载的渲染页面）
 │  ├─ index.html         # 界面骨架（含启动错误浮层）
 │  ├─ css/style.css      # 三套主题样式
-│  ├─ js/store.js        # 存储层（Neutralino 文件存储 + 浏览器 IndexedDB 兜底）
-│  ├─ js/app.js          # 核心逻辑
-│  └─ js/neutralino.js   # Neutralino 框架客户端库
-├─ installer.iss         # Inno Setup 安装脚本（编译出 墨页-setup.exe）
-├─ installer/            # 安装脚本依赖（中文语言文件等）
+│  ├─ js/store.js        # 存储层（通过 electronAPI 调主进程 fs）
+│  └─ js/app.js          # 核心逻辑
+├─ main.js               # Electron 主进程（窗口 + IPC + 文件读写）
+├─ preload.js            # 预加载脚本（把受限 IPC 暴露给渲染层）
+├─ lib/fsstore.js        # 纯 Node 文件存储层（主进程与测试共用）
+├─ resources/icons/      # 应用图标
 ├─ .github/workflows/    # GitHub Actions 自动构建 Release
-├─ bin/                  # Neutralino 跨平台二进制（构建用）
-├─ build.mjs             # 构建脚本（内联 + 打包 + 校验）
-├─ test/smoke.mjs        # 无头启动冒烟测试（jsdom）
-├─ neutralino.config.json
+├─ test/                 # 单测（真实 fs 持久化 + jsdom 渲染冒烟）
 └─ package.json
 ```
 

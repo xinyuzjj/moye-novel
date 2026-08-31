@@ -1,15 +1,48 @@
 {
   "name": "moye-novel",
-  "version": "1.2.3",
+  "version": "2.0.0",
   "private": true,
-  "description": "墨页 · 本地轻量小说写作软件（Neutralino 桌面壳 + 单文件内联构建）",
+  "description": "墨页 · 本地轻量小说写作软件（Electron 桌面壳，原生 fs 持久化）",
+  "main": "main.js",
+  "author": "峻峻尼",
+  "license": "MIT",
   "scripts": {
-    "build": "node build.mjs",
-    "test": "node test/smoke.mjs && node test/store-persist-test.mjs"
+    "start": "electron .",
+    "dist": "electron-builder",
+    "test": "node test/fsstore.test.mjs && node test/render-smoke.mjs"
   },
   "devDependencies": {
-    "@neutralinojs/neu": "^6.0.0",
-    "@electron/asar": "^3.2.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
     "jsdom": "^24.0.0"
+  },
+  "build": {
+    "appId": "com.moye.novel",
+    "productName": "墨页",
+    "copyright": "Copyright © 峻峻尼",
+    "files": [
+      "main.js",
+      "preload.js",
+      "lib/**/*",
+      "src/**/*"
+    ],
+    "directories": {
+      "output": "dist-electron",
+      "buildResources": "resources"
+    },
+    "electronDist": ".electron-dist",
+    "win": {
+      "target": ["nsis"],
+      "icon": "resources/icons/appIcon.png",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "墨页",
+      "artifactName": "moye-novel-setup-${version}.${ext}"
+    }
   }
 }
