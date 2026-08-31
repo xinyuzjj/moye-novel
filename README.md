@@ -4,7 +4,7 @@
 
 ![墨页主界面](docs/screenshot.png)
 
-**作者：峻峻尼 · 版本：v1.1.0 · 开源协议：MIT**
+**作者：峻峻尼 · 版本：v1.2.0 · 开源协议：MIT**
 
 ## 特性
 
@@ -23,9 +23,17 @@
 
 ## 快速开始
 
-### 直接运行（推荐）
+### 一键安装（推荐）
 
-1. 到 [Releases](../../releases) 下载最新版 `墨页-win_x64.exe` 与同目录的 `resources.neu`。
+1. 到 [Releases](../../releases) 下载 `墨页-setup.exe`。
+2. 双击运行，按向导安装（默认装到当前用户 `AppData\Programs\墨页`，**无需管理员权限**）。
+3. 安装完成后从**开始菜单 / 桌面快捷方式**启动即可，并自带卸载程序。
+
+> 若被 Windows SmartScreen 拦截，点“更多信息”→“仍要运行”即可。本软件未做代码签名，属正常现象，不影响使用。
+
+### 便携版（免安装）
+
+1. 到 [Releases](../../releases) 下载 `墨页-win_x64.exe` 与同目录的 `resources.neu`。
 2. 把 `墨页-win_x64.exe` 和 `resources.neu` 放在**同一个文件夹**里，双击 exe 即可。
 3. 也可双击同目录的 `launch.bat` 启动（会先校验两个文件是否齐全）。
 
@@ -61,6 +69,8 @@ node build.mjs       # 单文件内联 + 打包 + 自动解包校验
 │  ├─ js/store.js        # 存储层（Neutralino 文件存储 + 浏览器 IndexedDB 兜底）
 │  ├─ js/app.js          # 核心逻辑
 │  └─ js/neutralino.js   # Neutralino 框架客户端库
+├─ installer.iss         # Inno Setup 安装脚本（编译出 墨页-setup.exe）
+├─ installer/            # 安装脚本依赖（中文语言文件等）
 ├─ .github/workflows/    # GitHub Actions 自动构建 Release
 ├─ bin/                  # Neutralino 跨平台二进制（构建用）
 ├─ build.mjs             # 构建脚本（内联 + 打包 + 校验）

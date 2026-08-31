@@ -41,6 +41,18 @@ jobs:
       - name: Build (inline + neu build + verify)
         run: node build.mjs
 
+      # 用 Inno Setup 把 exe + resources.neu 打包成标准安装包（含开始菜单/桌面快捷方式、卸载程序）
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Build installer (墨页-setup.exe)
+        shell: pwsh
+        run: |
+          $iscc = (Get-Command ISCC -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) { $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" }
+          & $iscc installer.iss
+          if (-not (Test-Path "dist\墨页-setup.exe")) { throw "安装包未生成" }
+
       - name: Upload Release assets
         uses: softprops/action-gh-release@v2
         with:
@@ -48,7 +60,12 @@ jobs:
           body: |
             ## 墨页 · 本地轻量小说写作软件 ${{ github.ref_name }}
 
-            ### 下载与运行
+            ### 推荐：一键安装
+            - 下载 `墨页-setup.exe`，双击运行，按向导安装
+            - 安装后可从**开始菜单 / 桌面快捷方式**启动，并自带卸载程序
+            - 若被 SmartScreen 拦截，点“更多信息”→“仍要运行”即可（本软件未做代码签名，属正常现象）
+
+            ### 或：便携版（免安装）
             - 下载 `墨页-win_x64.exe` 与 `resources.neu`，放在**同一文件夹**
             - 双击 `墨页-win_x64.exe` 运行（或双击 `launch.bat`）
             - 稿件数据保存在 exe 同级的 `data/novels.json`，整包可随身携带
@@ -56,6 +73,7 @@ jobs:
             ### 特性
             纯本地、不联网、单 exe 仅约 2.4MB；分卷/章节管理、自动保存、实时字数统计、每日码字目标与进度、写作热力图、大纲/人物/设定/灵感资料栏、素材卡片、查找替换、历史快照、专注模式、三种主题、TXT / Markdown 导出与备份。
           files: |
+            dist/墨页-setup.exe
             dist/墨页/墨页-win_x64.exe
             dist/墨页/resources.neu
         env:
