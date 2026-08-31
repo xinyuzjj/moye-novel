@@ -31,6 +31,7 @@
       "buildResources": "resources"
     },
     "electronDist": ".electron-dist",
+    "publish": null,
     "win": {
       "target": ["nsis"],
       "icon": "resources/icons/appIcon.ico",
