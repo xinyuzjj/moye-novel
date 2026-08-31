@@ -138,6 +138,7 @@
     <div class="editor-head">
       <input type="text" id="chapterTitle" class="chapter-title" placeholder="章节标题" autocomplete="off">
       <div class="chapter-meta">
+        <button class="mini-btn primary" id="btnFormat" title="自动排版当前章节 (Ctrl+Shift+F)">排版</button>
         <button class="mini-btn" id="btnHistory" title="历史版本">历史</button>
         <button class="mini-btn danger" id="btnDelChapter">删除</button>
       </div>
@@ -275,6 +276,15 @@
       <label class="set-check"><input type="checkbox" id="setIndent"> 首行缩进两字符</label>
       <label class="set-check"><input type="checkbox" id="setTypewriter"> 打字机模式（光标居中）</label>
       <label class="set-check"><input type="checkbox" id="setSnap"> 保留章节历史快照</label>
+    </div>
+
+    <div class="set-group">
+      <label class="set-label">自动排版</label>
+      <label class="set-check"><input type="checkbox" id="setAutoFormat"> 失焦时自动排版当前章节</label>
+      <label class="set-check"><input type="checkbox" id="setFmtSpace"> 中文与英文/数字之间加空格</label>
+      <label class="set-check"><input type="checkbox" id="setFmtPunct"> 标点转换为全角（，。！？：；）</label>
+      <label class="set-check"><input type="checkbox" id="setFmtQuote"> 引号转换为全角（“”‘’）</label>
+      <label class="set-check"><input type="checkbox" id="setFmtIndent"> 每段首行空两格（全角空格）</label>
     </div>
 
     <div class="set-group">
@@ -446,6 +456,7 @@
   }, 6000);
 })();
 </script>
+<script src="../lib/format.js"></script>
 <script src="js/store.js"></script>
 <script src="js/app.js"></script>
 </body>

@@ -26,7 +26,8 @@
   const DEFAULT_SETTINGS = {
     theme: 'paper', fontSize: 18, lineHeight: 1.9, fontFamily: 'serif',
     editorWidth: 760, dailyGoal: 2000, autoSave: 0.8,
-    indent: true, typewriter: false, snapshot: true
+    indent: true, typewriter: false, snapshot: true,
+    autoFormat: true, fmtSpace: true, fmtPunct: true, fmtQuote: true, fmtIndent: true
   };
   const FONT_MAP = {
     serif: '"Songti SC","Noto Serif SC","Source Han Serif SC","SimSun",Georgia,serif',
@@ -165,6 +166,35 @@
   function flushChapter() {
     const f = findChapter(curChapterId);
     if (f && editor) { f.ch.html = editor.innerHTML; f.ch.words = countWords(editor.textContent); f.ch.updatedAt = Date.now(); }
+  }
+
+  /* ───────── 自动排版 ───────── */
+  function fmtOpts() { return { spaceCN: !!S.fmtSpace, fullPunct: !!S.fmtPunct, fullQuote: !!S.fmtQuote, indentFirst: !!S.fmtIndent }; }
+  function formattedToHtml(text) {
+    const parts = String(text || '').split('\n').map((p) => p === '' ? '<div><br></div>' : '<div>' + esc(p) + '</div>');
+    return parts.length ? parts.join('') : '<div><br></div>';
+  }
+  function setCursorToEnd(el) {
+    try {
+      el.focus();
+      const r = document.createRange(); r.selectNodeContents(el); r.collapse(false);
+      const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    } catch (e) {}
+  }
+  function formatCurrentChapter(manual) {
+    if (!editor) return;
+    const f = findChapter(curChapterId);
+    if (!f) { if (manual) toast('请先选择一个章节'); return; }
+    const before = editor.innerText || '';
+    const norm = before.replace(/\r/g, '');
+    const fmt = (window.MoyeFormat ? window.MoyeFormat.formatChapterText(before, fmtOpts()) : norm);
+    if (fmt === norm) { if (manual) toast('当前章节无需排版'); return; }
+    editor.innerHTML = formattedToHtml(fmt);
+    setCursorToEnd(editor);
+    f.ch.html = editor.innerHTML; f.ch.words = countWords(editor.textContent); f.ch.updatedAt = Date.now();
+    markNonEmpty(); updateWordsLive(); updateGoal();
+    if (manual) toast('已自动排版');
+    scheduleSave();
   }
 
   /* ───────── 字数 / 目标 ───────── */
@@ -671,6 +701,7 @@
     setRange('setWidth', S.editorWidth, 'valWidth', ''); setRange('setGoal', S.dailyGoal, 'valGoal', '');
     setRange('setAuto', S.autoSave, 'valAuto', '');
     $('#setIndent').checked = !!S.indent; $('#setTypewriter').checked = !!S.typewriter; $('#setSnap').checked = !!S.snapshot;
+    $('#setAutoFormat').checked = !!S.autoFormat; $('#setFmtSpace').checked = !!S.fmtSpace; $('#setFmtPunct').checked = !!S.fmtPunct; $('#setFmtQuote').checked = !!S.fmtQuote; $('#setFmtIndent').checked = !!S.fmtIndent;
     const dp = $('#dataPath'); if (dp) Store.dataPathText().then((t) => { dp.textContent = t; });
     const av = $('#aboutVersion'); if (av) av.textContent = 'v' + APP_VERSION;
     const av2 = $('#aboutVersion2'); if (av2) av2.textContent = 'v' + APP_VERSION;
@@ -682,6 +713,7 @@
     S.fontSize = +$('#setFont').value; S.lineHeight = +$('#setLine').value;
     S.editorWidth = +$('#setWidth').value; S.dailyGoal = +$('#setGoal').value; S.autoSave = +$('#setAuto').value;
     S.indent = $('#setIndent').checked; S.typewriter = $('#setTypewriter').checked; S.snapshot = $('#setSnap').checked;
+    S.autoFormat = $('#setAutoFormat').checked; S.fmtSpace = $('#setFmtSpace').checked; S.fmtPunct = $('#setFmtPunct').checked; S.fmtQuote = $('#setFmtQuote').checked; S.fmtIndent = $('#setFmtIndent').checked;
     setRange('setFont', S.fontSize, 'valFont', ''); setRange('setLine', S.lineHeight, 'valLine', '');
     setRange('setWidth', S.editorWidth, 'valWidth', ''); setRange('setGoal', S.dailyGoal, 'valGoal', '');
     setRange('setAuto', S.autoSave, 'valAuto', '');
@@ -815,11 +847,13 @@
       if (f) { f.ch.html = editor.innerHTML; f.ch.words = countWords(editor.textContent); f.ch.updatedAt = Date.now(); }
       markNonEmpty(); updateWordsLive(); updateCursorInfo(); scheduleSave(); updateGoal();
     });
+    $('#editor').addEventListener('blur', () => { if (S && S.autoFormat) formatCurrentChapter(false); });
     $('#chapterTitle').addEventListener('input', (e) => {
       const f = findChapter(curChapterId); if (f) { f.ch.title = e.target.value; renderTOC(); highlightTOC(); const st = $('#stChapter'); if (st) st.textContent = (f.vol.name ? f.vol.name + ' / ' : '') + (f.ch.title || '未命名'); scheduleSave(); }
     });
     $('#btnDelChapter').addEventListener('click', () => { if (curChapterId) deleteChapter(curChapterId); });
     $('#btnHistory').addEventListener('click', () => { renderHistory(); openDrawer('historyDrawer'); });
+    $('#btnFormat').addEventListener('click', () => formatCurrentChapter(true));
 
     // 资料栏
     $$('.outline-tab').forEach((t) => t.addEventListener('click', () => {
@@ -858,6 +892,7 @@
     $('#setIndent').addEventListener('change', onSettingChange);
     $('#setTypewriter').addEventListener('change', onSettingChange);
     $('#setSnap').addEventListener('change', onSettingChange);
+    ['setAutoFormat', 'setFmtSpace', 'setFmtPunct', 'setFmtQuote', 'setFmtIndent'].forEach((id) => $('#' + id).addEventListener('change', onSettingChange));
     $('#btnOpenData').addEventListener('click', async () => { if (!await Store.openDataFolder()) toast('当前为浏览器模式，数据存在 IndexedDB'); });
     $('#btnReloadData').addEventListener('click', async () => { const data = await Store.load(); if (data) { db = normalize(data); S = activeBook().settings; applySettings(); renderAll(); toast('已重新载入'); } });
     try {
@@ -880,6 +915,7 @@
       if ((e.ctrlKey || e.metaKey) && e.key === '/') { e.preventDefault(); toggleOutline(); }
       if ((e.ctrlKey || e.metaKey) && e.key === ',') { e.preventDefault(); openDrawer('settingsDrawer'); }
       if (e.key === 'F11') { e.preventDefault(); document.body.classList.toggle('focus-mode'); }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); formatCurrentChapter(true); }
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') { e.preventDefault(); $('#findBar').classList.add('show'); $('#findInput').focus(); }
     });
   }

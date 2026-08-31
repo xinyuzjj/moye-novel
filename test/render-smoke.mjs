@@ -56,10 +56,11 @@ function buildDom(dataDir) {
     }
   });
   const w = dom.window;
+  const formatJs = readFileSync(path.resolve(__dirname, '..', 'lib', 'format.js'), 'utf8');
   const storeJs = readFileSync(path.join(SRC, 'js', 'store.js'), 'utf8');
   const appJs = readFileSync(path.join(SRC, 'js', 'app.js'), 'utf8');
-  // 一次性 eval（store + app 拼在同一作用域），再手动派发 DOMContentLoaded 触发启动
-  w.eval(storeJs + '\n;\n' + appJs);
+  // 一次性 eval（format + store + app 拼在同一作用域），再手动派发 DOMContentLoaded 触发启动
+  w.eval(formatJs + '\n;\n' + storeJs + '\n;\n' + appJs);
   w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
   return dom;
 }
