@@ -31,7 +31,7 @@ function createWindow() {
     minHeight: 600,
     title: '墨页 · 小说写作',
     backgroundColor: '#f3efe6',
-    icon: path.join(__dirname, 'resources', 'icons', 'appIcon.png'),
+    icon: path.join(__dirname, 'resources', 'icons', 'appIcon.ico'),
     autoHideMenuBar: true,
     frame: false,
     titleBarStyle: 'hidden',
