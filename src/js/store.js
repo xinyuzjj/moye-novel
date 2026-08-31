@@ -26,30 +26,68 @@ const Store = (() => {
     try { return await withTimeout(fn.apply(null, args), ms, fallback); } catch (e) { return fallback; }
   }
 
-  /* ---------- Neutralino 路径 ---------- */
+  /* ---------- 递归创建目录 ----------
+   * 关键坑：Neutralino 的 filesystem.createDirectory 不会自动创建父目录，
+   * 直接建多级路径会因父目录不存在而静默失败，导致数据永远写不进去。
+   * 这里逐层建目录，返回最终目录是否就绪。 */
+  async function mkdirp(dir) {
+    const norm = String(dir).replace(/\\/g, '/');
+    const parts = norm.split('/').filter(Boolean);
+    let cur = '';
+    for (const p of parts) {
+      cur += (cur && !/^[A-Za-z]:$/.test(cur) ? '/' : '') + p;
+      let exists = false;
+      try {
+        const st = await nlCall(Neutralino.filesystem.getStats, [cur], 1200, null);
+        if (st && st.type && String(st.type).toUpperCase().indexOf('DIR') >= 0) exists = true;
+      } catch (e) {}
+      if (exists) continue;
+      await nlCall(Neutralino.filesystem.createDirectory, [cur], 1200, null);
+    }
+    try {
+      const st = await nlCall(Neutralino.filesystem.getStats, [dir], 1200, null);
+      return !!(st && st.type && String(st.type).toUpperCase().indexOf('DIR') >= 0);
+    } catch (e) { return false; }
+  }
+
+  /* ---------- 对话框返回路径归一化 ----------
+   * 不同版本 showSaveDialog / showOpenDialog 可能返回字符串，也可能返回
+   * {filePath} / {filePaths} 对象；统一归一化，避免把对象当路径传入 writeFile。 */
+  function normPath(p) {
+    if (!p) return null;
+    if (typeof p === 'string') return p;
+    if (typeof p === 'object') return normPath(p.filePath || p.path || null);
+    return null;
+  }
+  function pickPaths(res) {
+    if (!res) return [];
+    if (Array.isArray(res)) return res.map(normPath).filter(Boolean);
+    if (typeof res === 'object') {
+      if (Array.isArray(res.filePaths)) return res.filePaths.map(normPath).filter(Boolean);
+      if (res.filePath) return [normPath(res.filePath)];
+      if (res.path) return [normPath(res.path)];
+    }
+    return [];
+  }
+
+  /* ---------- Neutralino 数据目录 ----------
+   * 优先级：
+   *   1) window.NL_PATH（Neutralino 注入的程序所在目录）→ exe 同级 data，便携可带走
+   *   2) 文档目录 Documents/墨页小说写作/data（最可靠、用户易找）
+   *   3) 相对 data（最后兜底，不崩溃）
+   * 目录用 mkdirp 递归创建，确保一定存在。 */
   let _dataDir = null;
   async function dataDir() {
     if (_dataDir) return _dataDir;
-    let dir = null;
-    try {
-      const base = await nlCall(Neutralino.os.getPath, ['current'], 2000, null);
-      if (base) {
-        dir = base + '/data';
-        await nlCall(Neutralino.filesystem.createDirectory, [dir], 2000, null);
-      }
-    } catch (e) {}
-    if (!dir) {
-      try {
-        const docs = await nlCall(Neutralino.os.getPath, ['documents'], 2000, null);
-        if (docs) {
-          dir = docs + '/墨页小说写作/data';
-          await nlCall(Neutralino.filesystem.createDirectory, [dir], 2000, null);
-        }
-      } catch (e2) {}
+    const candidates = [];
+    try { if (typeof window !== 'undefined' && window.NL_PATH) candidates.push(String(window.NL_PATH).replace(/[\\/]$/, '') + '/data'); } catch (e) {}
+    try { const docs = await nlCall(Neutralino.os.getPath, ['documents'], 2000, null); if (docs) candidates.push(docs.replace(/[\\/]$/, '') + '/墨页小说写作/data'); } catch (e) {}
+    candidates.push('data');
+    for (const dir of candidates) {
+      if (await mkdirp(dir)) { _dataDir = dir; console.log('[墨页 存储] 数据目录：' + dir); return dir; }
     }
-    if (!dir) dir = 'data'; // 最后兜底，避免崩溃
-    _dataDir = dir;
-    return dir;
+    _dataDir = 'data';
+    return 'data';
   }
 
   async function dataPathText() {
@@ -77,7 +115,7 @@ const Store = (() => {
     if (NL()) {
       const dir = await dataDir();
       const file = dir + '/novels.json';
-      await nlCall(Neutralino.filesystem.writeFile, [file, txt], 2000, null);
+      await nlCall(Neutralino.filesystem.writeFile, [file, txt], 5000, null);
       return;
     }
     await browserSet('novels.json', txt);
@@ -142,12 +180,12 @@ const Store = (() => {
   async function exportText(filename, content) {
     if (NL()) {
       try {
-        const path = await nlCall(Neutralino.os.showSaveDialog, [{
+        const picked = normPath(await nlCall(Neutralino.os.showSaveDialog, [{
           title: '导出文件', filters: [{ name: '文本', extensions: ['txt', 'md'] }]
-        }], 5000, null);
-        if (!path) return null; // 用户取消
-        await nlCall(Neutralino.filesystem.writeFile, [path, content], 5000, null);
-        return path;
+        }], 8000, null));
+        if (!picked) return null; // 用户取消
+        await nlCall(Neutralino.filesystem.writeFile, [picked, content], 8000, null);
+        return picked;
       } catch (e) { return false; }
     }
     download(filename, content);
@@ -158,12 +196,12 @@ const Store = (() => {
     const json = JSON.stringify(db, null, 2);
     if (NL()) {
       try {
-        const path = await nlCall(Neutralino.os.showSaveDialog, [{
+        const picked = normPath(await nlCall(Neutralino.os.showSaveDialog, [{
           title: '备份全部数据', filters: [{ name: 'JSON', extensions: ['json'] }]
-        }], 5000, null);
-        if (!path) return null; // 用户取消
-        await nlCall(Neutralino.filesystem.writeFile, [path, json], 5000, null);
-        return path;
+        }], 8000, null));
+        if (!picked) return null; // 用户取消
+        await nlCall(Neutralino.filesystem.writeFile, [picked, json], 8000, null);
+        return picked;
       } catch (e) { return false; }
     }
     download('墨页-备份-' + Date.now() + '.json', json);
@@ -174,10 +212,10 @@ const Store = (() => {
   async function restore() {
     if (NL()) {
       try {
-        const paths = await Neutralino.os.showOpenDialog({
+        const paths = pickPaths(await Neutralino.os.showOpenDialog({
           title: '从备份恢复', filters: [{ name: 'JSON', extensions: ['json'] }]
-        });
-        if (!paths || !paths.length) return null;
+        }));
+        if (!paths.length) return null;
         const txt = await Neutralino.filesystem.readFile(paths[0]);
         return JSON.parse(txt);
       } catch (e) { return null; }
