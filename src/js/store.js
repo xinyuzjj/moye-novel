@@ -180,9 +180,9 @@ const Store = (() => {
   async function exportText(filename, content) {
     if (NL()) {
       try {
-        const picked = normPath(await nlCall(Neutralino.os.showSaveDialog, [{
-          title: '导出文件', filters: [{ name: '文本', extensions: ['txt', 'md'] }]
-        }], 8000, null));
+        const picked = normPath(await nlCall(Neutralino.os.showSaveDialog, ['导出文件', {
+          filters: [{ name: '文本', extensions: ['txt', 'md'] }]
+        }], 120000, null));
         if (!picked) return null; // 用户取消
         await nlCall(Neutralino.filesystem.writeFile, [picked, content], 8000, null);
         return picked;
@@ -196,9 +196,9 @@ const Store = (() => {
     const json = JSON.stringify(db, null, 2);
     if (NL()) {
       try {
-        const picked = normPath(await nlCall(Neutralino.os.showSaveDialog, [{
-          title: '备份全部数据', filters: [{ name: 'JSON', extensions: ['json'] }]
-        }], 8000, null));
+        const picked = normPath(await nlCall(Neutralino.os.showSaveDialog, ['备份全部数据', {
+          filters: [{ name: 'JSON', extensions: ['json'] }]
+        }], 120000, null));
         if (!picked) return null; // 用户取消
         await nlCall(Neutralino.filesystem.writeFile, [picked, json], 8000, null);
         return picked;
@@ -212,9 +212,9 @@ const Store = (() => {
   async function restore() {
     if (NL()) {
       try {
-        const paths = pickPaths(await Neutralino.os.showOpenDialog({
-          title: '从备份恢复', filters: [{ name: 'JSON', extensions: ['json'] }]
-        }));
+        const paths = pickPaths(await nlCall(Neutralino.os.showOpenDialog, ['从备份恢复', {
+          filters: [{ name: 'JSON', extensions: ['json'] }]
+        }], 120000, null));
         if (!paths.length) return null;
         const txt = await Neutralino.filesystem.readFile(paths[0]);
         return JSON.parse(txt);
@@ -243,10 +243,9 @@ const Store = (() => {
     if (!NL()) return false;
     try {
       const dir = await dataDir();
-      let cmd = 'explorer', args = [dir];
-      if (typeof navigator !== 'undefined' && /Mac/.test(navigator.platform)) { cmd = 'open'; args = [dir]; }
-      else if (typeof navigator !== 'undefined' && /Linux/.test(navigator.platform)) { cmd = 'xdg-open'; args = [dir]; }
-      await Neutralino.os.spawnProcess(cmd, args);
+      // Neutralino.os.open(path) 会调用系统默认程序打开该路径；
+      // 传目录时 Windows 用资源管理器、macOS 用访达、Linux 用文件管理器打开。
+      await Neutralino.os.open(dir);
       return true;
     } catch (e) { return false; }
   }

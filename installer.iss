@@ -1,7 +1,7 @@
 ; 墨页 安装脚本 (Inno Setup 6)
 ; 用法：ISCC.exe installer.iss  （需先 node build.mjs 生成 dist\墨页\）
 #define MyAppName "墨页"
-#define MyAppVersion "1.2.0"
+#define MyAppVersion "1.2.2"
 #define MyAppPublisher "峻峻尼"
 #define MyAppURL "https://github.com/xinyuzjj/moye-novel"
 #define MyAppExeName "墨页-win_x64.exe"

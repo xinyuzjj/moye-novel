@@ -1,6 +1,6 @@
 {
   "applicationId": "com.moye.novel",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "defaultMode": "window",
   "documentRoot": "/resources/",
   "url": "/",
@@ -23,8 +23,8 @@
       "icon": "/resources/icons/appIcon.png",
       "transparent": false,
       "backgroundColor": "#f3efe6",
-      "enableInspector": true,
-      "enableDevTools": true
+      "enableInspector": false,
+      "enableDevTools": false
     },
     "browser": {
       "userAgent": "MoyeNovel"
