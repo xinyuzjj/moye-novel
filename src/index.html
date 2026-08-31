@@ -89,6 +89,7 @@
     <button class="icon-btn" id="btnOutline" title="资料栏 (Ctrl+/)">资料</button>
     <button class="icon-btn" id="btnFocus" title="专注模式 (F11)">专注</button>
     <button class="icon-btn" id="btnExport" title="导出与备份">导出</button>
+    <button class="icon-btn" id="btnPlugins" title="插件管理">插件</button>
     <button class="icon-btn" id="btnSettings" title="设置 (Ctrl+,)">设置</button>
     <button class="icon-btn" id="btnAbout" title="关于墨页">关于</button>
   </div>
@@ -138,6 +139,7 @@
     <div class="editor-head">
       <input type="text" id="chapterTitle" class="chapter-title" placeholder="章节标题" autocomplete="off">
       <div class="chapter-meta">
+        <span id="pluginTools" class="plugin-tools"></span>
         <button class="mini-btn primary" id="btnFormat" title="自动排版当前章节 (Ctrl+Shift+F)">排版</button>
         <button class="mini-btn" id="btnHistory" title="历史版本">历史</button>
         <button class="mini-btn danger" id="btnDelChapter">删除</button>
@@ -302,6 +304,11 @@
       <p class="muted">本地存储，不联网，数据完全属于你。</p>
       <p class="muted" id="envInfo">运行环境：检测中…</p>
     </div>
+
+    <div class="set-group">
+      <label class="set-label">插件扩展</label>
+      <div id="pluginSettings"></div>
+    </div>
   </div>
 </div>
 
@@ -408,6 +415,21 @@
   </div>
 </div>
 
+<!-- 插件管理抽屉 -->
+<div class="drawer" id="pluginsDrawer">
+  <div class="drawer-head">
+    <h3>插件</h3>
+    <button class="icon-btn tiny" id="pluginsClose">✕</button>
+  </div>
+  <div class="drawer-body">
+    <p class="muted" style="line-height:1.8">勾选启用 / 取消停用插件。把插件文件夹放到「墨页」安装目录下的 <b>plugins\</b> 即可即插即用，无需重装。</p>
+    <div id="pluginsList"></div>
+    <div class="tool-row" style="margin-top:14px">
+      <button class="mini-btn" id="btnOpenPluginsFolder">打开插件目录</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- 启动错误浮层（默认隐藏，出错时由 app.js 显示） -->
@@ -457,6 +479,7 @@
 })();
 </script>
 <script src="../lib/format.js"></script>
+<script src="js/plugins/host.js"></script>
 <script src="js/store.js"></script>
 <script src="js/app.js"></script>
 </body>

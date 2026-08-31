@@ -385,3 +385,22 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 100;
 }
 .toast.show { opacity: .94; transform: translateX(-50%) translateY(0); }
+
+/* 插件系统 */
+.plugin-tools { display: inline-flex; gap: 6px; align-items: center; }
+.plugin-tools:empty { display: none; }
+.plugin-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px; }
+.plugin-row .pr-name { font-size: 14px; font-weight: 600; }
+.plugin-row .pr-tag { font-size: 11px; color: var(--accent); border: 1px solid var(--accent); border-radius: 6px; padding: 0 6px; margin-left: 6px; font-weight: 400; }
+.plugin-row .pr-desc { font-size: 12px; color: var(--ink-soft); line-height: 1.5; margin-top: 2px; }
+.plugin-row .pr-toggle { display: flex; align-items: center; }
+.plugin-row .pr-toggle input { width: 18px; height: 18px; }
+#pluginSettings .set-group { border-top: none; padding-top: 0; }
+/* 全文搜索结果 */
+.fts-input { width: 100%; box-sizing: border-box; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; margin-bottom: 10px; }
+.fts-count { font-size: 12px; color: var(--ink-soft); margin-bottom: 8px; }
+.fts-item { padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 7px; cursor: pointer; }
+.fts-item:hover { border-color: var(--accent); background: var(--bg); }
+.fts-item .fts-ch { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+.fts-item .fts-sn { font-size: 12px; color: var(--ink-soft); line-height: 1.55; }
+.fts-item .fts-sn mark { background: #ffe9a8; color: inherit; padding: 0 1px; border-radius: 2px; }

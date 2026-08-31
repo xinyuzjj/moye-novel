@@ -6,6 +6,7 @@ const fsstore = require('./lib/fsstore');
 
 let mainWin = null;
 let dataDir = null;
+let userPluginsDir = null;
 
 /* 数据目录解析：
  *  1) exe 同级 data/ —— 便携版/解压即用，数据随程序带走
@@ -21,6 +22,47 @@ function resolveDataDir() {
     if (fsstore.ensureWritable(d)) return d;
   }
   return candidates[1];
+}
+
+/* 用户插件目录：默认放在 userData/plugins（AppData 内，永远可写，即插即用最稳）。
+ * 同时扫描 exe 同级 plugins/（便携版解压即用）。两者都算「用户插件」。 */
+function resolveUserPluginsDir() {
+  return path.join(app.getPath('userData'), 'plugins');
+}
+
+/* 发现插件：扫描内置目录（asar 内）与用户目录（exe 同级），返回清单 + 入口脚本文本。
+ * 入口以文本形式回传，渲染进程用内联 <script> 执行，规避 file:// 进 asar 的坑。 */
+function scanPlugins() {
+  const out = [];
+  const roots = [
+    { dir: path.join(__dirname, 'src', 'js', 'plugins'), builtin: true },
+    { dir: userPluginsDir, builtin: false },
+    { dir: path.join(path.dirname(app.getPath('exe')), 'plugins'), builtin: false }
+  ];
+  for (const r of roots) {
+    if (!r.dir || !fs.existsSync(r.dir)) continue;
+    let names = [];
+    try {
+      names = fs.readdirSync(r.dir).filter((n) => {
+        try { return fs.statSync(path.join(r.dir, n)).isDirectory(); } catch (e) { return false; }
+      });
+    } catch (e) { continue; }
+    for (const name of names) {
+      const base = path.join(r.dir, name);
+      const mfPath = path.join(base, 'plugin.json');
+      if (!fs.existsSync(mfPath)) continue;
+      let mf;
+      try { mf = JSON.parse(fs.readFileSync(mfPath, 'utf8')); } catch (e) { continue; }
+      if (!mf.id) mf.id = name;
+      const entry = mf.entry || 'index.js';
+      const entryAbs = path.join(base, entry);
+      if (!fs.existsSync(entryAbs)) continue;
+      let entryText = '';
+      try { entryText = fs.readFileSync(entryAbs, 'utf8'); } catch (e) { continue; }
+      out.push({ manifest: mf, location: r.builtin ? 'builtin' : 'user', entryText });
+    }
+  }
+  return out;
 }
 
 function createWindow() {
@@ -105,11 +147,43 @@ function registerIpc() {
     try { shell.openPath(dataDir); return true; }
     catch (e) { return false; }
   });
+
+  // 插件：返回插件清单（含入口脚本文本）
+  ipcMain.handle('get-plugins', () => scanPlugins());
+
+  // 插件：打开用户插件目录（不存在则创建）
+  ipcMain.handle('open-plugins-folder', () => {
+    try { fsstore.ensureDir(userPluginsDir); shell.openPath(userPluginsDir); return true; }
+    catch (e) { return false; }
+  });
+
+  // 插件：在 data 目录内的沙箱文件读写（防目录穿越）
+  ipcMain.handle('plugin-fs', (e, arg) => {
+    const { op, rel, content } = arg || {};
+    if (!dataDir || !rel) return { ok: false, error: 'bad-arg' };
+    const p = path.join(dataDir, rel);
+    if (path.relative(dataDir, p).startsWith('..')) return { ok: false, error: 'forbidden' };
+    try {
+      if (op === 'write') { fsstore.ensureDir(path.dirname(p)); fs.writeFileSync(p, content); return { ok: true, path: p }; }
+      if (op === 'read') { return { ok: true, content: fs.readFileSync(p, 'utf8') }; }
+      if (op === 'list') {
+        if (!fs.existsSync(p)) return { ok: true, items: [] };
+        const items = fs.readdirSync(p);
+        return { ok: true, items };
+      }
+      if (op === 'delete') { fs.unlinkSync(p); return { ok: true }; }
+      if (op === 'ensureDir') { fsstore.ensureDir(p); return { ok: true }; }
+      return { ok: false, error: 'unknown-op' };
+    } catch (err) {
+      return { ok: false, error: String(err && err.message || err) };
+    }
+  });
 }
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
   dataDir = resolveDataDir();
+  userPluginsDir = resolveUserPluginsDir();
   console.log('[墨页] 数据目录：' + dataDir);
   registerIpc();
   createWindow();

@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   exportFile: (opts) => ipcRenderer.invoke('export-file', opts),
   importFile: (opts) => ipcRenderer.invoke('import-file', opts),
   openDataFolder: () => ipcRenderer.invoke('open-data-folder'),
+  openPluginsFolder: () => ipcRenderer.invoke('open-plugins-folder'),
+  getPlugins: () => ipcRenderer.invoke('get-plugins'),
+  pluginFs: (arg) => ipcRenderer.invoke('plugin-fs', arg),
   windowControl: (action) => ipcRenderer.invoke('window-control', action),
   onWindowState: (cb) => ipcRenderer.on('window-state', (_e, state) => cb(state))
 });

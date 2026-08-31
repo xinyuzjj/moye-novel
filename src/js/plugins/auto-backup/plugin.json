@@ -1,0 +1,9 @@
+{
+  "id": "auto-backup",
+  "name": "自动备份",
+  "version": "1.0.0",
+  "description": "每次保存后自动滚动备份全书到 data/backups/，保留最近 20 份，可一键恢复。",
+  "author": "墨页",
+  "entry": "index.js",
+  "builtin": true
+}

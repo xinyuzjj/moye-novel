@@ -1,0 +1,9 @@
+{
+  "id": "fulltext-search",
+  "name": "全文搜索",
+  "version": "1.0.0",
+  "description": "跨所有章节搜索当前作品内容，点击结果直接跳转。",
+  "author": "墨页",
+  "entry": "index.js",
+  "builtin": true
+}

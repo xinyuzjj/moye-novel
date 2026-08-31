@@ -1,0 +1,9 @@
+{
+  "id": "hello",
+  "name": "示例插件",
+  "version": "1.0.0",
+  "description": "演示：在工具栏加一个按钮，点击弹出问候。把本文件夹放进「墨页」安装目录的 plugins\\ 即生效。",
+  "author": "你",
+  "entry": "index.js",
+  "builtin": false
+}

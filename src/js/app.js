@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '2.0.0';
+  const APP_VERSION = '2.1.0';
 
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
@@ -36,6 +36,18 @@
   };
   const NOTE_CAT = { character: '人物', world: '设定', plot: '情节', other: '其他' };
   const CARD_TAB_NAME = { character: '人物', world: '设定', idea: '灵感' };
+
+  /* ───────── 插件事件总线 ───────── */
+  const pbus = {
+    _m: {},
+    on(ev, fn) { (this._m[ev] = this._m[ev] || []).push(fn); },
+    off(ev, fn) { if (this._m[ev]) this._m[ev] = this._m[ev].filter((f) => f !== fn); },
+    emit(ev) {
+      const a = Array.prototype.slice.call(arguments, 1);
+      (this._m[ev] || []).slice().forEach((f) => { try { f.apply(null, a); } catch (e) { console.error('[插件事件] ' + ev, e); } });
+    }
+  };
+  function emitPlugin(ev, payload) { pbus.emit(ev, payload); }
 
   let db = null, S = null, curChapterId = null, editor = null;
   let saveTimer = null, dirty = false, saving = false;
@@ -109,9 +121,10 @@
       settings: Object.assign({}, DEFAULT_SETTINGS), today: { date: dateKey(new Date()), words: 0 }, history: {}
     };
   }
-  function defaultDb() { return { books: [defaultBook()], activeId: null, dayBaseline: 0, today: null }; }
+  function defaultDb() { return { books: [defaultBook()], activeId: null, dayBaseline: 0, today: null, plugins: {} }; }
   function normalize(d) {
     if (!d.books || !d.books.length) d.books = [defaultBook()];
+    d.plugins = (d.plugins && typeof d.plugins === 'object') ? d.plugins : {};
     d.books.forEach((b) => {
       b.volumes = b.volumes || [];
       b.notes = b.notes || [];
@@ -154,6 +167,7 @@
     try {
       await Store.save(db);
       dirty = false; setSaveState('saved');
+      emitPlugin('save', { book: db.activeId });
     } catch (e) {
       setSaveState('failed');
       console.error('save failed', e);
@@ -269,6 +283,7 @@
     highlightTOC();
     const st = $('#stChapter'); if (st) st.textContent = (f.vol.name ? f.vol.name + ' / ' : '') + (f.ch.title || '未命名');
     updateWordsLive(); updateCursorInfo();
+    emitPlugin('chapterChange', { id, chapter: f.ch });
   }
   function newChapter() {
     const b = activeBook();
@@ -748,6 +763,7 @@
     curChapterId = null; applySettings(); renderAll();
     const first = allChapters()[0]; if (first) selectChapter(first.id);
     updateGoal(); scheduleSave();
+    emitPlugin('bookChange', { id });
   }
   let bookDialogMode = 'new';
   function openBookDialog(mode, id) {
@@ -790,6 +806,52 @@
   }
 
   /* ───────── 事件绑定 ───────── */
+  /* ───────── 插件上下文（暴露给插件的安全 API） ───────── */
+  function buildPluginCtx() {
+    return {
+      version: APP_VERSION,
+      electronAPI: window.electronAPI,
+      // 数据
+      getDb: () => db,
+      getBooks: () => db.books,
+      getActiveBook: () => activeBook(),
+      getBook: (id) => db.books.find((b) => b.id === id),
+      getChapter: (id) => { const f = findChapter(id); return f ? f.ch : null; },
+      getActiveChapter: () => { const f = findChapter(curChapterId); return f ? f.ch : null; },
+      getAllChapters: () => allChapters(),
+      htmlToText: (html) => htmlToPlain(html),
+      escapeHtml: esc,
+      // 持久化
+      scheduleSave: () => scheduleSave(),
+      saveNow: () => saveNow(),
+      replaceDb: (data) => { db = normalize(Object.assign(defaultDb(), data)); S = activeBook().settings; applySettings(); renderAll(); scheduleSave(); },
+      // 导航
+      selectChapter: (id) => selectChapter(id),
+      // UI
+      toast: (m) => toast(m),
+      openDrawer: (id) => openDrawer(id),
+      closeDrawer: (id) => closeDrawer(id),
+      // 事件
+      on: (ev, fn) => pbus.on(ev, fn),
+      off: (ev, fn) => pbus.off(ev, fn),
+      emit: (ev) => { pbus.emit.apply(null, arguments); },
+      // 设置（全局，存 db.plugins）
+      getSetting: (k, def) => { const v = db.plugins[k]; return (v === undefined ? def : v); },
+      setSetting: (k, v) => { db.plugins[k] = v; scheduleSave(); },
+      // UI 扩展点（委托给宿主）
+      ui: {
+        addToolbarButton: (o) => window.MoyePlugins._ui.addToolbarButton(o),
+        openModal: (o) => window.MoyePlugins._ui.openModal(o),
+        addSettingsSection: (o) => window.MoyePlugins._ui.addSettingsSection(o)
+      }
+    };
+  }
+  async function startPlugins() {
+    if (!window.MoyePlugins || !window.MoyePlugins.start) return;
+    try { await window.MoyePlugins.start(buildPluginCtx()); }
+    catch (e) { console.error('[墨页] 插件加载失败', e); }
+  }
+
   function bindUI() {
     // 顶栏
     $('#bookSwitch').addEventListener('click', (e) => {
@@ -813,6 +875,17 @@
     $('#btnSettings').addEventListener('click', () => openDrawer('settingsDrawer'));
     $('#btnAbout').addEventListener('click', () => openDrawer('aboutDialog'));
     $('#aboutClose').addEventListener('click', () => closeDrawer('aboutDialog'));
+
+    // 插件管理
+    $('#btnPlugins') && $('#btnPlugins').addEventListener('click', () => { if (window.MoyePlugins && window.MoyePlugins._buildDrawer) window.MoyePlugins._buildDrawer(); openDrawer('pluginsDrawer'); });
+    $('#pluginsClose') && $('#pluginsClose').addEventListener('click', () => closeDrawer('pluginsDrawer'));
+    $('#btnOpenPluginsFolder') && $('#btnOpenPluginsFolder').addEventListener('click', () => { if (window.electronAPI && window.electronAPI.openPluginsFolder) window.electronAPI.openPluginsFolder(); });
+    $('#pluginsList') && $('#pluginsList').addEventListener('change', (e) => {
+      const cb = e.target.closest('input[type=checkbox]');
+      if (!cb) return;
+      const row = e.target.closest('.plugin-row');
+      if (row && window.MoyePlugins) window.MoyePlugins.setEnabled(row.getAttribute('data-plugin'), cb.checked);
+    });
 
     // 侧栏
     $$('.side-tab').forEach((t) => t.addEventListener('click', () => {
@@ -1002,6 +1075,8 @@
     renderAll();
     if (S.snapshot) startSnapTimer();
     updateGoal();
+    bootLog('加载插件');
+    await startPlugins();
     bootLog('启动完成');
   }
 
