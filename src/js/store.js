@@ -34,19 +34,42 @@ const Store = (() => {
     const norm = String(dir).replace(/\\/g, '/');
     const parts = norm.split('/').filter(Boolean);
     let cur = '';
-    for (const p of parts) {
-      cur += (cur && !/^[A-Za-z]:$/.test(cur) ? '/' : '') + p;
+    let i = 0;
+    // Windows 盘符（如 C:）单独处理，后面必须补分隔符
+    if (parts.length && /^[A-Za-z]:$/.test(parts[0])) {
+      cur = parts[0] + '/';
+      i = 1;
+    }
+    for (; i < parts.length; i++) {
+      cur += parts[i];
       let exists = false;
       try {
         const st = await nlCall(Neutralino.filesystem.getStats, [cur], 1200, null);
         if (st && st.type && String(st.type).toUpperCase().indexOf('DIR') >= 0) exists = true;
       } catch (e) {}
-      if (exists) continue;
-      await nlCall(Neutralino.filesystem.createDirectory, [cur], 1200, null);
+      if (!exists) {
+        await nlCall(Neutralino.filesystem.createDirectory, [cur], 1200, null);
+      }
+      cur += '/';
     }
     try {
       const st = await nlCall(Neutralino.filesystem.getStats, [dir], 1200, null);
       return !!(st && st.type && String(st.type).toUpperCase().indexOf('DIR') >= 0);
+    } catch (e) { return false; }
+  }
+
+  /* ---------- 目录可写性实测 ----------
+   * 仅 mkdirp 成功还不够：必须真的写进去再读回来，确认该目录在本机会话内
+   * 可落盘。否则（例如路径指向只读区、或相对路径指向不确定的工作目录）
+   * 会被及时排除，dataDir 会改选下一个候选。 */
+  async function probeWritable(dir) {
+    try {
+      if (!(await mkdirp(dir))) return false;
+      const t = dir + '/.writetest';
+      await nlCall(Neutralino.filesystem.writeFile, [t, 'ok'], 1500, null);
+      const back = await nlCall(Neutralino.filesystem.readFile, [t], 1500, null);
+      await nlCall(Neutralino.filesystem.remove, [t], 1500, null).catch(() => {});
+      return back === 'ok';
     } catch (e) { return false; }
   }
 
@@ -84,7 +107,7 @@ const Store = (() => {
     try { const docs = await nlCall(Neutralino.os.getPath, ['documents'], 2000, null); if (docs) candidates.push(docs.replace(/[\\/]$/, '') + '/墨页小说写作/data'); } catch (e) {}
     candidates.push('data');
     for (const dir of candidates) {
-      if (await mkdirp(dir)) { _dataDir = dir; console.log('[墨页 存储] 数据目录：' + dir); return dir; }
+      if (await probeWritable(dir)) { _dataDir = dir; console.log('[墨页 存储] 数据目录：' + dir); return dir; }
     }
     _dataDir = 'data';
     return 'data';
