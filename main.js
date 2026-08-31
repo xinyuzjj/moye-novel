@@ -32,6 +32,7 @@ function createWindow() {
     title: '墨页 · 小说写作',
     backgroundColor: '#f3efe6',
     icon: path.join(__dirname, 'resources', 'icons', 'appIcon.png'),
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
