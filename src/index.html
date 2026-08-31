@@ -27,6 +27,17 @@
   #bootSplash .err { color: #a8412f; margin-top: 18px; max-width: 560px; white-space: pre-wrap; word-break: break-word; text-align: left;
     background: #fffdf8; border: 1px solid #e2dccd; border-radius: 10px; padding: 14px 16px; font-size: 12.5px; }
   #bootSplash .hint { margin-top: 18px; font-size: 13px; color: #6b665c; }
+  /* 关于对话框 */
+  .about-body { padding: 24px 26px; text-align: center; }
+  .about-logo { font-size: 42px; letter-spacing: 10px; color: var(--accent); font-weight: 700; margin-bottom: 6px; }
+  .about-sub { color: var(--ink-soft); font-size: 14px; margin-bottom: 20px; }
+  .about-row { display: flex; justify-content: space-between; max-width: 240px; margin: 0 auto 10px; font-size: 14px; }
+  .about-row span { color: var(--ink-soft); }
+  .about-row b { color: var(--ink); font-weight: 600; }
+  .about-body .muted { line-height: 1.9; }
+  .about-link { display: inline-block; margin: 16px 0 8px; color: var(--accent); text-decoration: none; font-size: 13px; }
+  .about-link:hover { text-decoration: underline; }
+  .about-copy { color: var(--ink-soft); font-size: 12px; margin-top: 16px; }
 </style>
 </head>
 <body data-theme="paper">
@@ -66,6 +77,7 @@
     <button class="icon-btn" id="btnFocus" title="专注模式 (F11)">专注</button>
     <button class="icon-btn" id="btnExport" title="导出与备份">导出</button>
     <button class="icon-btn" id="btnSettings" title="设置 (Ctrl+,)">设置</button>
+    <button class="icon-btn" id="btnAbout" title="关于墨页">关于</button>
   </div>
 </header>
 
@@ -261,7 +273,8 @@
     </div>
 
     <div class="set-group about">
-      <p>墨页 · 小说写作 v1.0.0</p>
+      <p>墨页 · 小说写作 <span id="aboutVersion">v1.1.0</span></p>
+      <p class="muted">作者：峻峻尼</p>
       <p class="muted">本地存储，不联网，数据完全属于你。</p>
       <p class="muted" id="envInfo">运行环境：检测中…</p>
     </div>
@@ -326,6 +339,24 @@
     <button class="mini-btn danger" id="bkDelete">删除此作品</button>
     <span class="spacer"></span>
     <button class="mini-btn primary" id="bkSave">保存</button>
+  </div>
+</div>
+
+<!-- 关于对话框 -->
+<div class="drawer dialog" id="aboutDialog">
+  <div class="drawer-head">
+    <h3>关于 墨页</h3>
+    <button class="icon-btn tiny" id="aboutClose">✕</button>
+  </div>
+  <div class="drawer-body about-body">
+    <div class="about-logo">墨页</div>
+    <div class="about-sub">本地轻量小说写作软件</div>
+    <div class="about-row"><span>版本</span><b id="aboutVersion2">v1.1.0</b></div>
+    <div class="about-row"><span>作者</span><b>峻峻尼</b></div>
+    <p class="muted">纯本地运行，不联网，你的稿件只存在自己电脑上。</p>
+    <p class="muted">基于 Neutralinojs 构建 · 单 exe 仅约 2.4MB</p>
+    <a class="about-link" href="https://github.com/xinyuzjj/moye-novel" target="_blank" rel="noopener">GitHub：xinyuzjj/moye-novel ↗</a>
+    <p class="about-copy">© 峻峻尼 · MIT License</p>
   </div>
 </div>
 

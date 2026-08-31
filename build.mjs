@@ -75,7 +75,19 @@ function rmSafe(p) {
   try { rmSync(p, { recursive: true, force: true }); } catch (e) { console.warn('  ⚠ 清理跳过（被占用）：', p); }
 }
 
+function ensureBinPlaceholders() {
+  // neu build --release 在 Windows 上仍会尝试复制所有平台二进制与 WebView2Loader.dll，
+  // 本地只需 Windows exe 即可，跨平台文件用空占位避免 ENOENT，构建后会自动清理。
+  const binDir = join(__dirname, 'bin');
+  if (!existsSync(binDir)) mkdirSync(binDir, { recursive: true });
+  for (const f of ['neutralino-linux_x64', 'neutralino-linux_ia32', 'neutralino-linux_armhf', 'neutralino-mac_x64', 'WebView2Loader.dll']) {
+    const p = join(binDir, f);
+    if (!existsSync(p)) { writeFileSync(p, ''); console.log('  已创建 Neutralino 占位：' + f); }
+  }
+}
+
 function neuBuild() {
+  ensureBinPlaceholders();
   // 旧版 neu 的 --clean 在新版 CLI 已移除；手动清理缓存/旧产物，避免用上一轮的包蒙混过关
   for (const d of ['.tmp', 'temp', join('dist', '墨页')]) {
     const p = join(__dirname, d);
@@ -127,6 +139,7 @@ async function verifyPackage() {
   const exe = join(__dirname, 'dist', '墨页', '墨页-win_x64.exe');
   const neuSize = statSync(pkg).size;
   const exeSize = existsSync(exe) ? statSync(exe).size : 0;
+  if (!exeSize) throw new Error('未生成有效的 exe 文件，neu build 可能失败（检查 bin/ 是否缺少跨平台二进制占位）');
   console.log('✔ 解包校验通过：单文件 html 含全部逻辑，无 css/js 碎片');
   console.log('   包内文件:', files.join(', '));
   console.log(`   体积 → exe ${(exeSize / 1024 / 1024).toFixed(2)} MB · resources.neu ${(neuSize / 1024).toFixed(0)} KB`);

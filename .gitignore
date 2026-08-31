@@ -1,7 +1,8 @@
 # 依赖
 node_modules/
 
-# 构建中间产物（由 build.mjs 自动生成）
+# 构建中间产物 / 本机二进制（由 build.mjs 自动生成或从 release 下载）
+bin/
 resources/
 .tmp/
 temp/

@@ -2,7 +2,9 @@
 
 一款**纯本地、轻量、不联网**的小说写作桌面软件。单 exe 仅约 2.4MB，所有稿件数据都存在你电脑上的 `data/` 文件夹，随手可带走，不上传任何云端。
 
-![墨页](src/icons/appIcon.png)
+![墨页主界面](docs/screenshot.png)
+
+**作者：峻峻尼 · 版本：v1.1.0 · 开源协议：MIT**
 
 ## 特性
 
@@ -59,6 +61,7 @@ node build.mjs       # 单文件内联 + 打包 + 自动解包校验
 │  ├─ js/store.js        # 存储层（Neutralino 文件存储 + 浏览器 IndexedDB 兜底）
 │  ├─ js/app.js          # 核心逻辑
 │  └─ js/neutralino.js   # Neutralino 框架客户端库
+├─ .github/workflows/    # GitHub Actions 自动构建 Release
 ├─ bin/                  # Neutralino 跨平台二进制（构建用）
 ├─ build.mjs             # 构建脚本（内联 + 打包 + 校验）
 ├─ test/smoke.mjs        # 无头启动冒烟测试（jsdom）
@@ -78,4 +81,4 @@ node build.mjs       # 单文件内联 + 打包 + 自动解包校验
 
 ## 许可证
 
-[MIT](LICENSE) © 墨页
+[MIT](LICENSE) © 峻峻尼

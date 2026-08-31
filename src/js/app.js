@@ -2,6 +2,8 @@
 (function () {
   'use strict';
 
+  const APP_VERSION = '1.1.0';
+
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -574,6 +576,8 @@
     setRange('setAuto', S.autoSave, 'valAuto', '');
     $('#setIndent').checked = !!S.indent; $('#setTypewriter').checked = !!S.typewriter; $('#setSnap').checked = !!S.snapshot;
     const dp = $('#dataPath'); if (dp) Store.dataPathText().then((t) => { dp.textContent = t; });
+    const av = $('#aboutVersion'); if (av) av.textContent = 'v' + APP_VERSION;
+    const av2 = $('#aboutVersion2'); if (av2) av2.textContent = 'v' + APP_VERSION;
   }
   function setSeg(id, v) { $$('#' + id + ' button').forEach((b) => b.classList.toggle('active', b.dataset.v === v)); }
   function setRange(id, v, label, suffix) { const el = $('#' + id); if (el) el.value = v; const l = $('#' + label); if (l) l.textContent = v + (suffix || ''); }
@@ -679,6 +683,8 @@
     $('#exportMenu').addEventListener('click', (e) => { const b = e.target.closest('button[data-act]'); if (b) doExport(b.dataset.act); });
     document.addEventListener('click', (e) => { if (!e.target.closest('#btnExport') && !e.target.closest('#exportMenu')) closePopup(); });
     $('#btnSettings').addEventListener('click', () => openDrawer('settingsDrawer'));
+    $('#btnAbout').addEventListener('click', () => openDrawer('aboutDialog'));
+    $('#aboutClose').addEventListener('click', () => closeDrawer('aboutDialog'));
 
     // 侧栏
     $$('.side-tab').forEach((t) => t.addEventListener('click', () => {
