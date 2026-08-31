@@ -25,7 +25,7 @@
 
 ### 一键安装（推荐）
 
-1. 到 [Releases](../../releases) 下载 `墨页-setup.exe`。
+1. 到 [Releases](../../releases) 下载 `moye-novel-setup.exe`。
 2. 双击运行，按向导安装（默认装到当前用户 `AppData\Programs\墨页`，**无需管理员权限**）。
 3. 安装完成后从**开始菜单 / 桌面快捷方式**启动即可，并自带卸载程序。
 
@@ -33,7 +33,7 @@
 
 ### 便携版（免安装）
 
-1. 到 [Releases](../../releases) 下载 `墨页-win_x64.exe` 与同目录的 `resources.neu`。
+1. 到 [Releases](../../releases) 下载 `moye-novel-win_x64.exe` 与同目录的 `resources.neu`。
 2. 把 `墨页-win_x64.exe` 和 `resources.neu` 放在**同一个文件夹**里，双击 exe 即可。
 3. 也可双击同目录的 `launch.bat` 启动（会先校验两个文件是否齐全）。
 
