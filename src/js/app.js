@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '2.6.0';
+  const APP_VERSION = '2.7.0';
 
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
@@ -303,11 +303,13 @@
     const g = $('#stGoal'); if (g) g.textContent = '今日 ' + written + ' / ' + goal;
     const fill = $('#goalFill'); if (fill) fill.style.width = pct + '%';
     const t = $('#stTotal'); if (t) t.textContent = '全书 ' + totalWordsNow() + ' 字';
+    updateTodayHero(); updateFocusHud();
   }
   function updateWordsLive() {
     const f = findChapter(curChapterId);
     const w = f ? (f.ch.words || 0) : 0;
     const el = $('#stWords'); if (el) el.textContent = w + ' 字';
+    updateFocusHud();
   }
 
   /* ───────── 目录树 ───────── */
@@ -333,7 +335,7 @@
         chs.forEach((c) => {
           shownCh++;
           const item = document.createElement('div');
-          item.className = 'toc-chapter' + (c.id === curChapterId ? ' selected' : '');
+          item.className = 'toc-chapter' + (c.id === curChapterId ? ' selected' : '') + (c.done ? ' done' : '');
           item.draggable = true; item.dataset.type = 'chapter'; item.dataset.id = c.id;
           item.innerHTML = '<span class="ch-title">' + esc(c.title || '未命名') + '</span>' +
             '<span class="ch-words">' + (c.words || 0) + '</span>';
@@ -354,6 +356,7 @@
   /* ───────── 章节操作 ───────── */
   function selectChapter(id) {
     if (curChapterId && id !== curChapterId) flushChapter();
+    hideDoneBar();
     const f = findChapter(id); if (!f) return;
     curChapterId = id;
     editor.innerHTML = f.ch.html || '';
@@ -388,6 +391,29 @@
     const v = { id: uid(), name: '新分卷', collapsed: false, chapters: [] };
     b.volumes.push(v);
     renderTOC(); scheduleSave(); toast('已新建分卷');
+  }
+  function nextChapterId(id) {
+    const b = activeBook();
+    let hit = false;
+    for (const v of b.volumes) {
+      for (const c of v.chapters) {
+        if (hit) return c.id;
+        if (c.id === id) hit = true;
+      }
+    }
+    return null;
+  }
+  function hideDoneBar() { const bar = $('#chapterDoneBar'); if (bar) bar.hidden = true; }
+  function doneChapter() {
+    const f = findChapter(curChapterId); if (!f) return;
+    f.ch.done = true; renderTOC(); scheduleSave();
+    const nx = nextChapterId(curChapterId);
+    const msg = $('#doneMsg'); if (msg) msg.textContent = '「' + (f.ch.title || '未命名') + '」已标记完成 🎉';
+    const bar = $('#chapterDoneBar'); if (bar) bar.hidden = false;
+    const nb = $('#doneNext');
+    if (nb) { nb.hidden = false; nb.textContent = nx ? '写下一章 →' : '新建章节 →'; }
+    const st = $('#doneStay'); if (st) st.hidden = false;
+    toast('本章已完成，去写下一章吧');
   }
   async function deleteChapter(id) {
     const f = findChapter(id); if (!f) return;
@@ -623,25 +649,63 @@
     renderNotes(); closeDrawer('noteDrawer'); scheduleSave();
   }
 
-  /* ───────── 统计 ───────── */
+  /* ───────── 统计（以「今天」为主） ───────── */
+  function todayStat() {
+    const tk = dateKey(new Date());
+    const goal = S.dailyGoal || 2000;
+    const written = (db.today && db.today.date === tk) ? (db.today.words || 0) : 0;
+    const pct = Math.min(100, Math.round((written / goal) * 100));
+    const remain = Math.max(0, goal - written);
+    const over = Math.max(0, written - goal);
+    return { tk, goal, written, pct, remain, over };
+  }
+  function curWords() { const f = findChapter(curChapterId); return f ? (f.ch.words || 0) : 0; }
   function renderStats() {
     const body = $('#statsBody'); if (!body) return;
     const b = activeBook();
-    const tk = dateKey(new Date());
+    const ts = todayStat();
     const days = [];
     for (let i = 13; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); const k = dateKey(d); days.push({ k, w: b.history[k] || 0 }); }
     const maxW = Math.max(1, ...days.map((d) => d.w));
-    const goal = S.dailyGoal || 2000;
-    const heat = days.map((d) => {
-      let lvl = 0; if (d.w > 0) lvl = 1; if (d.w >= goal * 0.3) lvl = 2; if (d.w >= goal * 0.6) lvl = 3; if (d.w >= goal) lvl = 4;
-      return '<div class="heat-cell lvl' + lvl + '" data-tip="' + d.k + '：' + d.w + ' 字"></div>';
+    const bars = days.map((d) => {
+      const h = Math.round((d.w / maxW) * 78);
+      const t = d.k === ts.tk;
+      return '<div class="bar-col' + (t ? ' today' : '') + '"><div class="bar' + (t ? ' today' : '') + '" style="height:' + h + 'px"></div><div class="bar-d">' + d.k.slice(5) + '</div></div>';
     }).join('');
-    const bars = days.map((d) => '<div class="bar-col"><div class="bar" style="height:' + Math.round((d.w / maxW) * 90) + 'px"></div><div>' + d.k.slice(5) + '</div></div>').join('');
+    const heat = days.map((d) => {
+      let lvl = 0; if (d.w > 0) lvl = 1; if (d.w >= ts.goal * 0.3) lvl = 2; if (d.w >= ts.goal * 0.6) lvl = 3; if (d.w >= ts.goal) lvl = 4;
+      return '<div class="heat-cell lvl' + lvl + (d.k === ts.tk ? ' today' : '') + '" data-tip="' + d.k + '：' + d.w + ' 字"></div>';
+    }).join('');
     body.innerHTML =
-      '<div class="stat-block"><h4>全书字数</h4><div class="stat-bignum">' + totalWordsNow() + ' 字</div></div>' +
-      '<div class="stat-block"><h4>近 14 天码字热力</h4><div class="heatmap">' + heat + '</div></div>' +
-      '<div class="stat-block"><h4>近 14 天柱状</h4><div class="barchart">' + bars + '</div></div>' +
-      '<div class="stat-block"><h4>今日进度</h4><div>已写 ' + (db.today ? db.today.words : 0) + ' / ' + goal + ' 字</div></div>';
+      '<div class="stat-today">' +
+        '<div class="st-today-ring" id="stTodayRing"><div class="st-today-ring-in"><b id="stTodayRingNum">0</b><span>%</span></div></div>' +
+        '<div class="st-today-info">' +
+          '<div class="st-today-num" id="stTodayNum">今日已写 0 字</div>' +
+          '<div class="st-today-sub" id="stTodaySub">目标 0 字</div>' +
+          '<div class="st-goal-bar"><i id="stTodayFill"></i></div>' +
+          '<div class="st-today-extra" id="stTodayExtra"></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="stat-block"><h4>近 14 天（今天高亮）</h4><div class="barchart">' + bars + '</div></div>' +
+      '<div class="stat-block"><h4>码字热力（今天高亮）</h4><div class="heatmap">' + heat + '</div></div>' +
+      '<div class="stat-block"><h4>全书字数</h4><div class="stat-bignum">' + totalWordsNow() + ' 字</div></div>';
+    updateTodayHero(); updateFocusHud();
+  }
+  function updateTodayHero() {
+    const ts = todayStat();
+    const ring = $('#stTodayRing'); if (ring) ring.style.setProperty('--p', ts.pct);
+    const num = $('#stTodayRingNum'); if (num) num.textContent = ts.pct;
+    const n = $('#stTodayNum'); if (n) n.innerHTML = '今日已写 <b>' + ts.written + '</b> 字';
+    const sub = $('#stTodaySub'); if (sub) sub.textContent = '目标 ' + ts.goal + ' 字' + (ts.over ? ' · 已超额 ' + ts.over + ' 字 🎉' : ' · 还差 ' + ts.remain + ' 字');
+    const f = $('#stTodayFill'); if (f) f.style.width = ts.pct + '%';
+    const ex = $('#stTodayExtra'); if (ex) ex.textContent = '当前章节 ' + curWords() + ' 字 · 全书 ' + totalWordsNow() + ' 字';
+  }
+  function updateFocusHud() {
+    const hud = $('#focusHud'); if (!hud) return;
+    const ts = todayStat();
+    const f = findChapter(curChapterId);
+    const name = f ? ((f.vol.name ? f.vol.name + ' / ' : '') + (f.ch.title || '未命名')) : '未选章节';
+    hud.innerHTML = '今日 <b>' + ts.written + '</b> / ' + ts.goal + ' 字 · ' + esc(name) + ' · ' + curWords() + ' 字';
   }
 
   /* ───────── 资料栏（现为知识库栏） ───────── */
@@ -1271,9 +1335,14 @@
     $$('.side-tab').forEach((t) => t.addEventListener('click', () => {
       $$('.side-tab').forEach((x) => x.classList.toggle('active', x === t));
       $$('.side-view').forEach((v) => v.classList.toggle('active', v.dataset.view === t.dataset.view));
+      if (t.dataset.view === 'stats') renderStats();
     }));
     $('#btnNewChapter').addEventListener('click', newChapter);
     $('#btnNewVolume').addEventListener('click', newVolume);
+    $('#btnDoneChapter').addEventListener('click', doneChapter);
+    $('#doneNext').addEventListener('click', () => { const nx = nextChapterId(curChapterId); hideDoneBar(); if (nx) selectChapter(nx); else newChapter(); });
+    $('#doneNew').addEventListener('click', () => { hideDoneBar(); newChapter(); });
+    $('#doneStay').addEventListener('click', hideDoneBar);
     $('#tocSearch').addEventListener('input', (e) => { tocFilter = e.target.value; renderTOC(); });
     $('#tocTree').addEventListener('click', async (e) => {
       const ch = e.target.closest('.toc-chapter'); if (ch) { selectChapter(ch.dataset.id); return; }
