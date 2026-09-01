@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '2.4.4';
+  const APP_VERSION = '2.5.0';
 
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
@@ -191,6 +191,7 @@
       volumes: [{ id: uid(), name: '正文', collapsed: false, chapters: [{ id: cid, title: '第一章', html: '', words: 0, updatedAt: Date.now(), snapshots: [] }] }],
       notes: [], outline: { outline: '', character: '', world: '', idea: '' },
       cards: { character: [], world: [], idea: [] },
+      characters: [],
       settings: Object.assign({}, DEFAULT_SETTINGS), today: { date: dateKey(new Date()), words: 0 }, history: {}
     };
   }
@@ -211,6 +212,7 @@
         if (oldText && !b.cards[k].length) b.cards[k].push({ id: uid(), name: '', meta: '', desc: oldText, tags: [] });
         b.cards[k].forEach((c) => { c.id = c.id || uid(); c.tags = Array.isArray(c.tags) ? c.tags : []; });
       });
+      b.characters = Array.isArray(b.characters) ? b.characters : [];
       b.settings = Object.assign({}, DEFAULT_SETTINGS, b.settings || {});
       b.volumes.forEach((v) => { v.chapters = v.chapters || []; v.chapters.forEach((c) => { c.snapshots = c.snapshots || []; }); });
       if (!b.today) b.today = { date: dateKey(new Date()), words: 0 };
@@ -443,18 +445,117 @@
     if (to < 0) b.volumes.push(v); else b.volumes.splice(to < from ? to : to, 0, v);
   }
 
-  /* ───────── 素材 ───────── */
+  /* ───────── 人物 / 素材 ───────── */
+  // 常见姓氏（单字）与复姓，用于从正文中自动识别有名有姓的出场人物
+  const SURNAMES = new Set('赵钱孙李周吴郑王冯陈褚卫蒋沈韩杨朱秦尤许何吕施张孔曹严华金魏陶姜戚谢邹喻柏水窦章云苏潘葛奚范彭郎鲁韦昌马苗凤花方俞任袁柳酆鲍史唐费廉岑薛雷贺倪汤滕殷罗毕郝邬安常乐于时傅皮卞齐康伍余元卜顾孟平黄和穆萧尹姚邵湛汪祁毛禹狄米贝明臧计伏成戴谈宋茅庞熊纪舒屈项祝董梁杜阮蓝闵席季麻强贾路娄危江童颜郭梅盛林刁钟徐邱骆高夏蔡田樊胡凌霍虞万支柯昝管卢莫经房裘缪干解应宗丁宣贲邓郁单杭洪包诸左石崔吉钮龚程嵇邢滑裴陆荣翁荀羊於惠甄曲家封芮羿储靳汲邴糜松井段富巫乌焦巴弓牧隗山谷车侯宓蓬全郗班仰秋仲伊宫宁仇栾暴甘钭厉戎祖武符刘景詹束龙叶幸司韶郜黎蓟薄印宿白怀蒲邰从鄂索咸籍赖卓蔺屠蒙池乔阴胥能苍双闻莘党翟谭贡劳逄姬申扶堵冉宰郦雍却璩桑桂濮牛寿通边扈燕冀郏浦尚农温别庄晏柴瞿阎充慕连茹习宦艾鱼容向古易慎戈廖庾终暨居衡步都耿满弘匡国文寇广禄阙东'.split(''));
+  const DOUBLE_SURNAMES = new Set(['欧阳','太史','端木','上官','司马','东方','独孤','南宫','万俟','闻人','夏侯','诸葛','尉迟','羊舌','公羊','澹台','公冶','宗政','濮阳','淳于','单于','太叔','申屠','公孙','仲孙','轩辕','令狐','钟离','宇文','长孙','慕容','鲜于','闾丘','司徒','司空','亓官','司寇','仉督','子车','颛孙','端木','巫马','公西','漆雕','乐正','壤驷','公良','拓跋','夹谷','宰父','谷梁','段干','百里','东郭','南门','呼延','归海','羊舌','微生','岳帅','缑亢','况后','有琴','梁丘','左丘','东门','西门','商牟','佘佴','伯赏','南宫','墨哈','谯笪','年爱','阳佟','第五','言福']);
+  const NAME_BLACKLIST = new Set(['今天','明天','昨天','后天','早上','上午','中午','下午','晚上','夜里','夜晚','午夜','凌晨','清晨','傍晚','现在','过去','未来','刚才','一会儿','很久','曾经','忽然','突然','猛然','竟然','居然','果然','虽然','但是','然而','可是','因为','所以','因此','如果','即使','尽管','不但','而且','或者','还是','要么','我们','你们','他们','她们','它们','大家','咱们','自己','别人','人家','某人','有人','这个','那个','这些','那些','这里','那里','这边','那边','东西','地方','时间','时候','时刻','年代','年月','日子','生活','人生','世界','社会','国家','城市','乡村','地方','房间','屋子','门口','窗外','桌上','地上','手中','心里','眼前','耳边','身后','故事','小说','章节','正文','内容','情节','作品','作者','读者','主角','配角','人物','角色','名字','姓名','称呼','称号','标题','目录','大纲','设定','灵感','素材','笔记','记录','备注','说明','描述','介绍','评论','想法','看法','意见','建议','问题','答案','原因','结果','过程','方式','方法','技巧','经验','知识','理论','概念','定义','解释','例子','案例','事实','真相','谎言','谣言','消息','新闻','传闻','事件','事故','事情','事务','业务','工作','任务','项目','计划','目标','目的','意图','愿望','梦想','理想','现实','实际','假象','幻觉','错觉','感觉','感受','心情','情绪','表情','神态','动作','行为','言语','话语','声音','语气','语调','口吻','口气','态度','模样','样子','外貌','长相','身材','身高','体型','体重','面容','脸色','眼神','目光','神情','神色','气色','姿态','姿势','举止','习惯','爱好','特长','优点','缺点','特点','特征','个性','性格','脾气','性情','气质','品质','品德','道德','修养','素质','能力','本领','技能','才华','才能','智慧','聪明','才智','头脑','思想','思维','念头','心思','心意','欲望','野心','雄心','抱负','志向','志气','意志','毅力','决心','信心','信念','信仰','观念','观点','见解','认识','理解','体会','感悟','感慨','感叹','惊叹','惊奇','惊讶','诧异','疑惑','困惑','怀疑','信任','依赖','依靠','指望','期望','希望','盼望','渴望','期待','等待','守候','陪伴','相随','同行','共处','相处','交往','交流','沟通','交谈','谈话','聊天','对话','讨论','议论','争论','辩论','争吵','吵架','打斗','战斗','战争','战役','战场','武器','兵器','刀剑','弓箭','枪支','炮火','弹药','军队','士兵','将军','元帅','国王','皇后','公主','王子','皇帝','陛下','大人','老爷','夫人','小姐','公子','少爷','姑娘','娘子','相公','官人','侠客','英雄','好汉','壮士','义士','隐士','高人','神仙','妖怪','魔鬼','鬼魂','灵魂','尸体','身体','性命','生命','生死','命运','运气','机遇','机缘','缘分','姻缘','情缘','情感','感情','爱情','友情','亲情','交情','私情','恩情','仇恨','怨恨','愤怒','怒火','怒气','暴怒','狂怒','哀伤','悲伤','悲痛','忧伤','忧愁','忧郁','郁闷','烦闷','烦恼','苦恼','痛苦','难受','心疼','心酸','心碎','绝望','失望','失落','沮丧','消沉','颓废','落寞','孤独','寂寞','空虚','无聊','疲惫','疲倦','劳累','辛苦','艰难','困难','困苦','贫困','贫穷','富裕','富有','富贵','荣华','奢华','豪华','简朴','朴素','平凡','普通','寻常','平常','一般','特别','特殊','格外','尤其','十分','非常','极其','极端','绝对','完全','彻底','究竟','到底','简直','几乎','大概','大约','左右','上下','以内','以外','之前','之后','之间','之内','其中','其余','其他','另外','此外','反而','反倒','何况','况且','要不','不然','否则','除非','假如','假定','假设','设若','若是','倘若','倘使','只要','只有','无论','不管','不论','虽说','固然','自然','当然','其实','实际上','事实上','本来','原来','向来','从来','一直','始终','永远','永久','长久','短暂','暂时','临时','蓦然','欣然','怅然','惘然','愕然','茫然','恍然','泰然','安然','淡然','漠然','热情','冷淡','冷漠','冷酷','残忍','善良','仁慈','和蔼','温和','温柔','体贴','细心','粗心','大意','马虎','认真','仔细','谨慎','小心','大胆','勇敢','胆怯','懦弱','软弱','坚强','顽强','固执','倔强','顽固','死板','灵活','机灵','聪明','愚蠢','愚笨','笨拙','伶俐','乖巧','顽皮','淘气','老实','憨厚','狡猾','奸诈','虚伪','真诚','诚实','坦率','直率','爽快','爽朗','开朗','活泼','内向','外向','安静','文静','稳重','成熟','幼稚','天真','单纯','复杂','深奥','浅显','简单','容易','困难','轻松','愉快','高兴','快乐','开心','欢乐','欢喜','喜悦','兴奋','激动','感动','震撼','惊讶','吃惊','意外','幸运','幸福','美满','甜蜜','温馨','和谐','和睦','融洽','友好','亲切','热烈','无情','绝情','狠心','恶毒','邪恶','阴险','狡诈','伪装','表象','表面','本质','实质','核心','关键','重点','要点','要害','细节','环节','步骤','程序','流程','顺序','秩序','结构','组织','系统','体系','机制','体制','制度','规则','规矩','规范','准则','原则','标准','水平','程度','等级','级别','层次','阶层','阶级','地位','身份','资格','资历','经历','阅历','学历','学位','职称','职务','职位','岗位','事业','产业','行业','专业','手艺','技术','途径','渠道','来源','根源','起因','后果','效果','成果','成效','成绩','成就','成功','胜利','挫折','过失','罪过','罪恶','罪行','犯罪','惩罚','处罚','处分','责备','责怪','埋怨','抱怨','牢骚','不满','气愤','气恼','恼火','恼怒','嫉恨','嫉妒','羡慕','仰慕','钦佩','敬佩','敬重','尊敬','尊重','轻视','鄙视','蔑视','藐视','侮辱','羞辱','欺凌','欺负','压迫','剥削','压榨','搜刮','掠夺','抢夺','抢劫','盗窃','偷盗','偷窃','贪污','受贿','行贿','诈骗','欺骗','哄骗','诱骗','诱惑','引诱','引导','指导','教导','教诲','教训','训诫','劝诫','劝告','劝说','说服','劝导','开导','启发','启示','启迪','启蒙','感化','感染','影响','作用','效用','效力','功能','机能','性能','性质','中心','重心','焦点','热点','难点','疑点','盲点','误区','偏差','差错','失误','误会','误解','曲解','歪曲','颠倒','错乱','混乱','杂乱','凌乱','整齐','整洁','干净','清洁','卫生','肮脏','污秽','污浊','浑浊','清澈','清晰','明白','明确','模糊','含糊','朦胧','隐约','迷迷糊糊','昏昏沉沉','糊里糊涂','稀里糊涂','莫名其妙','不可思议']);
+  const NAME_STOP = new Set('的是了着过吗呢吧啊哦嗯唉也得在与和把被让给向对从到为以就都以把被让给向对从到为以就都由跟与同和对于关于由于把被让给向对从到为以就都与同和对于关于由于'.split(''));
+
+  function extractCharacterNames() {
+    const b = activeBook();
+    const chapters = allChapters();
+    const order = {};
+    chapters.forEach((c, i) => order[c.id] = i);
+    const map = new Map();
+    chapters.forEach((ch) => {
+      const text = htmlToPlain(ch.html);
+      const matches = text.match(/[\u4e00-\u9fa5]{2,4}/g) || [];
+      matches.forEach((m) => {
+        if (NAME_BLACKLIST.has(m)) return;
+        let sur = '', rest = '';
+        const d2 = m.slice(0, 2);
+        if (DOUBLE_SURNAMES.has(d2)) { sur = d2; rest = m.slice(2); }
+        else {
+          if (!SURNAMES.has(m[0])) return;
+          sur = m[0]; rest = m.slice(1);
+        }
+        if (!rest || rest.length > 2) return;
+        // 名字部分不能全是虚词/数字/量词
+        if (Array.from(rest).every((c) => NAME_STOP.has(c))) return;
+        const rec = map.get(m) || { chapterIds: [], count: 0 };
+        if (!rec.chapterIds.includes(ch.id)) rec.chapterIds.push(ch.id);
+        rec.count++;
+        map.set(m, rec);
+      });
+    });
+    const arr = [];
+    map.forEach((v, name) => {
+      v.chapterIds.sort((a, b) => (order[a] || 0) - (order[b] || 0));
+      arr.push({ name, chapterIds: v.chapterIds.slice(), count: v.count });
+    });
+    arr.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'zh-CN'));
+    return arr;
+  }
+  function refreshCharacters() {
+    const b = activeBook();
+    const extracted = extractCharacterNames();
+    const existing = new Map((b.characters || []).map((c) => [c.name, c]));
+    b.characters = extracted.map((item) => {
+      const old = existing.get(item.name) || {};
+      return { id: old.id || uid(), name: item.name, chapterIds: item.chapterIds, count: item.count, ignored: !!old.ignored, updatedAt: Date.now() };
+    });
+    renderNotes();
+    scheduleSave();
+    const visible = b.characters.filter((c) => !c.ignored).length;
+    toast('已识别 ' + visible + ' 位出场人物' + (b.characters.length > visible ? '（忽略 ' + (b.characters.length - visible) + ' 个）' : ''));
+  }
+  function ignoreCharacter(id) {
+    const b = activeBook(); const c = (b.characters || []).find((x) => x.id === id);
+    if (!c) return; c.ignored = true; renderNotes(); scheduleSave();
+  }
+
   function renderNotes() {
     const list = $('#noteList'); if (!list) return;
     const b = activeBook();
     list.innerHTML = '';
-    if (!b.notes.length) { list.innerHTML = '<div class="empty-tip">还没有素材<br>点「＋ 新建素材」记录人物、设定、灵感</div>'; return; }
-    b.notes.forEach((n) => {
-      const card = document.createElement('div'); card.className = 'note-card'; card.dataset.id = n.id;
-      card.innerHTML = '<div class="nc-title"><span>' + esc(n.title || '未命名') + '</span><span class="nc-cat">' + (NOTE_CAT[n.cat] || '其他') + '</span></div>' +
-        '<div class="nc-body">' + esc(n.body || '') + '</div>';
-      list.appendChild(card);
-    });
+
+    // 1) 自动识别的人物
+    const chars = (b.characters || []).filter((c) => !c.ignored);
+    if (chars.length) {
+      chars.forEach((c) => {
+        const card = document.createElement('div'); card.className = 'character-item'; card.dataset.id = c.id;
+        const chaps = c.chapterIds.map((id) => {
+          const f = findChapter(id);
+          if (!f) return '';
+          const title = (f.ch.title || '未命名').slice(0, 12);
+          return '<span class="ci-chap" data-id="' + id + '" title="' + esc(f.vol.name + ' / ' + f.ch.title) + '">' + esc(title) + '</span>';
+        }).join('');
+        card.innerHTML =
+          '<div class="ci-main">' +
+            '<div class="ci-info">' +
+              '<span class="ci-name">' + esc(c.name) + '</span>' +
+              '<span class="ci-count">' + c.count + ' 次出场</span>' +
+            '</div>' +
+            '<div class="ci-actions">' +
+              '<button class="ci-action" data-act="ignore" title="忽略此人">忽略</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="ci-chapters" hidden>' + chaps + '</div>';
+        list.appendChild(card);
+      });
+    }
+
+    // 2) 手动素材卡片
+    const notes = b.notes || [];
+    if (notes.length) {
+      if (chars.length) {
+        const sep = document.createElement('div');
+        sep.className = 'note-section-title';
+        sep.textContent = '手动素材';
+        list.appendChild(sep);
+      }
+      notes.forEach((n) => {
+        const card = document.createElement('div'); card.className = 'note-card'; card.dataset.id = n.id;
+        card.innerHTML = '<div class="nc-title"><span>' + esc(n.title || '未命名') + '</span><span class="nc-cat">' + (NOTE_CAT[n.cat] || '其他') + '</span></div>' +
+          '<div class="nc-body">' + esc(n.body || '') + '</div>';
+        list.appendChild(card);
+      });
+    }
+
+    if (!chars.length && !notes.length) {
+      list.innerHTML = '<div class="empty-tip">还没有识别到人物<br>点「刷新人物」扫描全篇</div>';
+    }
   }
   function openNote(id) {
     const b = activeBook(); const n = b.notes.find((x) => x.id === id);
@@ -1099,7 +1200,21 @@
     $('#tocTree').addEventListener('drop', onDrop);
 
     $('#btnNewNote').addEventListener('click', () => openNote(null));
-    $('#noteList').addEventListener('click', (e) => { const c = e.target.closest('.note-card'); if (c) openNote(c.dataset.id); });
+    $('#btnRefreshChars').addEventListener('click', refreshCharacters);
+    $('#noteList').addEventListener('click', (e) => {
+      const chap = e.target.closest('.ci-chap');
+      if (chap) { selectChapter(chap.dataset.id); return; }
+      const act = e.target.closest('.ci-action');
+      if (act && act.dataset.act === 'ignore') { const item = act.closest('.character-item'); if (item) ignoreCharacter(item.dataset.id); return; }
+      const item = e.target.closest('.character-item');
+      if (item) {
+        const chaps = item.querySelector('.ci-chapters');
+        if (chaps && !e.target.closest('.ci-action')) chaps.hidden = !chaps.hidden;
+        return;
+      }
+      const c = e.target.closest('.note-card');
+      if (c) openNote(c.dataset.id);
+    });
     $('#noteSave').addEventListener('click', saveNote);
     $('#noteClose').addEventListener('click', () => closeDrawer('noteDrawer'));
     $('#noteDelete').addEventListener('click', deleteNote);
@@ -1280,6 +1395,8 @@
     bootLog('加载插件');
     await startPlugins();
     bootLog('启动完成');
+    // 测试/外部集成钩子（不影响正常使用）
+    try { window.__moyeDb = db; window.__testRefreshCharacters = refreshCharacters; } catch (e) {}
   }
 
   // 最终保险：无论任何原因，6.5 秒后必须让界面出来
@@ -1292,6 +1409,7 @@
     try { renderAll(); } catch (e) {}
     try { restoreKbWidth(); } catch (e) {}
     try { updateGoal(); } catch (e) {}
+    try { window.__moyeDb = db; window.__testRefreshCharacters = refreshCharacters; } catch (e) {}
     if (window.__hideBootSplash) window.__hideBootSplash();
     if (window.__markBootDone) window.__markBootDone();
   }, 6500);

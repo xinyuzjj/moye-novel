@@ -105,6 +105,25 @@ function buildDom(dataDir) {
   ok('知识库面板含列表与切换按钮', !!doc3.getElementById('kbList') && !!doc3.getElementById('kbSwitch'));
   dom3.window.close();
 
+  // 第四阶段：素材栏自动识别出场人物
+  const dom4 = buildDom(dataDir);
+  await wait(1600);
+  const w4 = dom4.window, doc4 = w4.document;
+  ok('素材栏存在「刷新人物」按钮', !!doc4.getElementById('btnRefreshChars'));
+  // 向当前作品注入一段包含人名的章节正文，再刷新人物
+  const b4 = w4.__moyeDb && w4.__moyeDb.books[0];
+  if (b4 && b4.volumes[0] && b4.volumes[0].chapters[0]) {
+    b4.volumes[0].chapters[0].html = '<div>张三看了看李四，王五也走了过来。</div><div>李四说：「这里风景不错。」</div>';
+    b4.volumes[0].chapters[0].words = 100;
+    if (w4.__testRefreshCharacters) w4.__testRefreshCharacters();
+    await wait(300);
+  }
+  ok('人物列表已渲染（.character-item 存在）', !!doc4.querySelector('.character-item'));
+  const firstName = doc4.querySelector('.character-item .ci-name');
+  ok('识别到人物名', !!firstName && firstName.textContent.trim() !== '');
+  ok('人物项含出场章节标签（.ci-chap）', !!doc4.querySelector('.character-item .ci-chap'));
+  dom4.window.close();
+
   try { fs.rmSync(dataDir, { recursive: true, force: true }); } catch (e) {}
   console.log('\n结果：' + pass + ' 通过 / ' + fail + ' 失败');
   process.exitCode = fail ? 1 : 0;
