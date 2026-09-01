@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '2.5.2';
+  const APP_VERSION = '2.5.3';
 
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
@@ -28,7 +28,7 @@
     editorWidth: 760, dailyGoal: 2000, autoSave: 0.8,
     indent: true, typewriter: false, snapshot: true,
     autoFormat: true, fmtSpace: true, fmtPunct: true, fmtQuote: true, fmtIndent: true,
-    kbFolder: ''
+    kbFolder: '', bg: 'theme', bgColor: '#f7f3ea'
   };
   const FONT_MAP = {
     serif: '"Songti SC","Noto Serif SC","Source Han Serif SC","SimSun",Georgia,serif',
@@ -320,23 +320,26 @@
     b.volumes.forEach((v) => {
       const chs = v.chapters.filter((c) => !q || (c.title || '').toLowerCase().includes(q));
       if (q && chs.length === 0) return;
-      const vol = document.createElement('div'); vol.className = 'toc-volume'; vol.dataset.id = v.id;
+      const vol = document.createElement('div'); vol.className = 'toc-volume' + (v.collapsed ? ' collapsed' : ''); vol.dataset.id = v.id;
       const row = document.createElement('div'); row.className = 'row'; row.draggable = true; row.dataset.type = 'volume'; row.dataset.id = v.id;
-      row.innerHTML = '<span class="vol-name">' + esc(v.name) + '</span>' +
+      row.innerHTML = '<span class="vol-name"><span class="vol-fold">' + (v.collapsed ? '▸' : '▾') + '</span>' + esc(v.name) + '</span>' +
         '<span class="vol-tools">' +
+        '<button class="row-btn" data-act="add-chap" data-id="' + v.id + '" title="在本卷添加章节">＋章</button>' +
         '<button class="row-btn" data-act="rename-vol" data-id="' + v.id + '">改名</button>' +
         '<button class="row-btn" data-act="del-vol" data-id="' + v.id + '">删</button></span>';
       vol.appendChild(row);
       const list = document.createElement('div'); list.className = 'toc-chapters';
-      chs.forEach((c) => {
-        shownCh++;
-        const item = document.createElement('div');
-        item.className = 'toc-chapter' + (c.id === curChapterId ? ' selected' : '');
-        item.draggable = true; item.dataset.type = 'chapter'; item.dataset.id = c.id;
-        item.innerHTML = '<span class="ch-title">' + esc(c.title || '未命名') + '</span>' +
-          '<span class="ch-words">' + (c.words || 0) + '</span>';
-        list.appendChild(item);
-      });
+      if (!v.collapsed) {
+        chs.forEach((c) => {
+          shownCh++;
+          const item = document.createElement('div');
+          item.className = 'toc-chapter' + (c.id === curChapterId ? ' selected' : '');
+          item.draggable = true; item.dataset.type = 'chapter'; item.dataset.id = c.id;
+          item.innerHTML = '<span class="ch-title">' + esc(c.title || '未命名') + '</span>' +
+            '<span class="ch-words">' + (c.words || 0) + '</span>';
+          list.appendChild(item);
+        });
+      }
       vol.appendChild(list);
       tree.appendChild(vol);
     });
@@ -361,14 +364,24 @@
     updateWordsLive(); updateCursorInfo();
     emitPlugin('chapterChange', { id, chapter: f.ch });
   }
-  function newChapter() {
+  function newChapter(volId) {
     const b = activeBook();
-    let vol = b.volumes[b.volumes.length - 1];
+    let vol = volId ? b.volumes.find((x) => x.id === volId) : null;
+    if (!vol) vol = b.volumes[b.volumes.length - 1];
     if (!vol) { vol = { id: uid(), name: '正文', collapsed: false, chapters: [] }; b.volumes.push(vol); }
+    vol.collapsed = false;
     const c = { id: uid(), title: '新章节', html: '', words: 0, updatedAt: Date.now(), snapshots: [] };
     vol.chapters.push(c);
     renderTOC(); selectChapter(c.id); scheduleSave(); updateGoal();
     const t = $('#chapterTitle'); if (t) { t.focus(); t.select(); }
+  }
+  function newChapterInVolume(volId) { newChapter(volId); }
+  function toggleVolume(volId) {
+    const b = activeBook();
+    const v = b.volumes.find((x) => x.id === volId);
+    if (!v) return;
+    v.collapsed = !v.collapsed;
+    renderTOC(); scheduleSave();
   }
   function newVolume() {
     const b = activeBook();
@@ -992,6 +1005,9 @@
     root.style.setProperty('--editor-lineheight', String(S.lineHeight || 1.9));
     root.style.setProperty('--editor-font', FONT_MAP[S.fontFamily] || FONT_MAP.serif);
     setSeg('setTheme', S.theme);
+    setSeg('setBg', S.bg || 'theme');
+    const bgc = $('#setBgColor'); if (bgc) { bgc.value = S.bgColor || '#f7f3ea'; bgc.style.display = (S.bg === 'custom') ? '' : 'none'; }
+    applyEditorBg();
     setSeg('setFontFamily', S.fontFamily);
     setRange('setFont', S.fontSize, 'valFont', ''); setRange('setLine', S.lineHeight, 'valLine', '');
     setRange('setWidth', S.editorWidth, 'valWidth', ''); setRange('setGoal', S.dailyGoal, 'valGoal', '');
@@ -1002,10 +1018,21 @@
     const av = $('#aboutVersion'); if (av) av.textContent = 'v' + APP_VERSION;
     const av2 = $('#aboutVersion2'); if (av2) av2.textContent = 'v' + APP_VERSION;
   }
+  function applyEditorBg() {
+    const es = $('#editorScroll'); const ed = $('#editor');
+    if (!es) return;
+    const presets = { white: '#ffffff', paper: '#f7f3ea', parchment: '#efe2c8', green: '#c7edcc', dark: '#26262b' };
+    let color = null, ink = '';
+    if (S.bg === 'custom') { color = (S.bgColor || '').trim(); }
+    else if (presets[S.bg]) { color = presets[S.bg]; if (S.bg === 'dark') ink = '#e8e6e0'; }
+    es.style.background = color || '';
+    if (ed) ed.style.color = ink || '';
+  }
   function setSeg(id, v) { $$('#' + id + ' button').forEach((b) => b.classList.toggle('active', b.dataset.v === v)); }
   function setRange(id, v, label, suffix) { const el = $('#' + id); if (el) el.value = v; const l = $('#' + label); if (l) l.textContent = v + (suffix || ''); }
   function onSettingChange() {
     S.theme = segVal('setTheme'); S.fontFamily = segVal('setFontFamily');
+    S.bg = segVal('setBg') || 'theme'; const bc = $('#setBgColor'); if (bc) S.bgColor = bc.value;
     S.fontSize = +$('#setFont').value; S.lineHeight = +$('#setLine').value;
     S.editorWidth = +$('#setWidth').value; S.dailyGoal = +$('#setGoal').value; S.autoSave = +$('#setAuto').value;
     S.indent = $('#setIndent').checked; S.typewriter = $('#setTypewriter').checked; S.snapshot = $('#setSnap').checked;
@@ -1232,12 +1259,17 @@
     $('#tocSearch').addEventListener('input', (e) => { tocFilter = e.target.value; renderTOC(); });
     $('#tocTree').addEventListener('click', async (e) => {
       const ch = e.target.closest('.toc-chapter'); if (ch) { selectChapter(ch.dataset.id); return; }
-      const act = e.target.closest('[data-act]'); if (act && act.dataset.act === 'rename-vol') {
+      const act = e.target.closest('[data-act]');
+      if (act && act.dataset.act === 'add-chap') { newChapterInVolume(act.dataset.id); return; }
+      if (act && act.dataset.act === 'rename-vol') {
         const v = activeBook().volumes.find((x) => x.id === act.dataset.id);
         const name = await showPrompt('分卷名称', v.name);
         if (name != null) { v.name = name; renderTOC(); scheduleSave(); }
+        return;
       }
-      if (act && act.dataset.act === 'del-vol') deleteVolume(act.dataset.id);
+      if (act && act.dataset.act === 'del-vol') { deleteVolume(act.dataset.id); return; }
+      const nameEl = e.target.closest('.vol-name');
+      if (nameEl) { const vol = nameEl.closest('.toc-volume'); if (vol) toggleVolume(vol.dataset.id); }
     });
     $('#tocTree').addEventListener('dragstart', onDragStart);
     $('#tocTree').addEventListener('dragover', onDragOver);
@@ -1352,6 +1384,8 @@
     $('#drawerMask').addEventListener('click', () => { $$('.drawer.show').forEach((d) => d.classList.remove('show')); $('#drawerMask').classList.remove('show'); });
     $('#setTheme').addEventListener('click', (e) => { const b = e.target.closest('button[data-v]'); if (b) onSettingChange(); });
     $('#setFontFamily').addEventListener('click', (e) => { const b = e.target.closest('button[data-v]'); if (b) onSettingChange(); });
+    $('#setBg').addEventListener('click', (e) => { const b = e.target.closest('button[data-v]'); if (b) onSettingChange(); });
+    $('#setBgColor').addEventListener('input', onSettingChange);
     ['setFont', 'setLine', 'setWidth', 'setGoal', 'setAuto'].forEach((id) => $('#' + id).addEventListener('input', onSettingChange));
     $('#setIndent').addEventListener('change', onSettingChange);
     $('#setTypewriter').addEventListener('change', onSettingChange);
@@ -1387,6 +1421,12 @@
       if (e.key === 'F11') { e.preventDefault(); document.body.classList.toggle('focus-mode'); }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); formatCurrentChapter(true); }
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') { e.preventDefault(); $('#findBar').classList.add('show'); $('#findInput').focus(); }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        try { flushChapter(); } catch (er) {}
+        scheduleSave();
+        toast('已保存');
+      }
     });
   }
 

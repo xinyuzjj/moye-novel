@@ -181,7 +181,8 @@ button { font-family: inherit; cursor: pointer; }
   display: flex; align-items: center; gap: 6px; padding: 7px 8px; border-radius: 8px; cursor: pointer;
 }
 .toc-volume > .row:hover { background: var(--sel); }
-.toc-volume .vol-name { flex: 1; font-weight: 600; font-size: 13px; }
+.toc-volume .vol-name { flex: 1; font-weight: 600; font-size: 13px; cursor: pointer; user-select: none; }
+.toc-volume .vol-fold { display: inline-block; width: 14px; color: var(--ink-soft); font-size: 11px; text-align: center; }
 .toc-volume .vol-tools { display: none; gap: 4px; }
 .toc-volume:hover .vol-tools { display: flex; }
 .toc-chapters { margin-left: 14px; border-left: 1px dashed var(--line); padding-left: 6px; }
