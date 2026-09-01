@@ -171,6 +171,12 @@ button { font-family: inherit; cursor: pointer; }
 .mini-btn.primary:hover { filter: brightness(1.05); }
 .mini-btn.danger { color: var(--danger); border-color: var(--line); }
 .mini-btn.danger:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+.mini-btn.icon-del {
+  width: 32px; min-width: 32px; padding: 0; justify-content: center;
+  color: var(--ink-soft); border-color: transparent; background: transparent; font-size: 15px;
+}
+.mini-btn.icon-del:hover { color: var(--danger); background: rgba(168,65,47,.08); border-color: rgba(168,65,47,.2); }
+.chapter-meta .icon-del { margin-left: 4px; }
 
 .toc-tree { flex: 1; overflow: auto; padding: 6px 8px; }
 .side-foot { padding: 8px 12px; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 12px; }
