@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '2.5.3';
+  const APP_VERSION = '2.5.4';
 
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
@@ -830,18 +830,20 @@
   }
 
   /* ───────── 历史快照 ───────── */
+  function takeSnapshot(force) {
+    const f = findChapter(curChapterId); if (!f) return false;
+    const tk = Date.now();
+    if (!force && tk - lastSnapAt < 5 * 60 * 1000) return false;
+    lastSnapAt = tk;
+    f.ch.snapshots = f.ch.snapshots || [];
+    f.ch.snapshots.unshift({ t: tk, html: f.ch.html || '', words: f.ch.words || 0 });
+    if (f.ch.snapshots.length > 30) f.ch.snapshots.length = 30;
+    scheduleSave();
+    return true;
+  }
   function startSnapTimer() {
     clearInterval(snapTimer);
-    snapTimer = setInterval(() => {
-      const f = findChapter(curChapterId); if (!f) return;
-      const tk = Date.now();
-      if (tk - lastSnapAt < 5 * 60 * 1000) return;
-      lastSnapAt = tk;
-      f.ch.snapshots = f.ch.snapshots || [];
-      f.ch.snapshots.unshift({ t: tk, html: f.ch.html || '', words: f.ch.words || 0 });
-      if (f.ch.snapshots.length > 30) f.ch.snapshots.length = 30;
-      scheduleSave();
-    }, 30 * 1000);
+    snapTimer = setInterval(() => takeSnapshot(false), 30 * 1000);
   }
   function renderHistory() {
     const list = $('#historyList'); if (!list) return;
@@ -1234,7 +1236,7 @@
     });
     $('#exportMenu').addEventListener('click', (e) => { const b = e.target.closest('button[data-act]'); if (b) doExport(b.dataset.act); });
     document.addEventListener('click', (e) => { if (!e.target.closest('#btnExport') && !e.target.closest('#exportMenu')) closePopup(); });
-    $('#btnSettings').addEventListener('click', () => openDrawer('settingsDrawer'));
+    $('#btnSettings').addEventListener('click', () => { openDrawer('settingsDrawer'); applySettings(); });
     $('#btnAbout').addEventListener('click', () => openDrawer('aboutDialog'));
     $('#aboutClose').addEventListener('click', () => closeDrawer('aboutDialog'));
 
@@ -1384,8 +1386,16 @@
     $('#drawerMask').addEventListener('click', () => { $$('.drawer.show').forEach((d) => d.classList.remove('show')); $('#drawerMask').classList.remove('show'); });
     $('#setTheme').addEventListener('click', (e) => { const b = e.target.closest('button[data-v]'); if (b) onSettingChange(); });
     $('#setFontFamily').addEventListener('click', (e) => { const b = e.target.closest('button[data-v]'); if (b) onSettingChange(); });
-    $('#setBg').addEventListener('click', (e) => { const b = e.target.closest('button[data-v]'); if (b) onSettingChange(); });
+    $('#setBg').addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-v]'); if (!b) return;
+      if (b.dataset.v === 'custom') {
+        const picker = $('#setBgColor');
+        if (picker) { picker.style.display = ''; picker.click(); }
+      }
+      onSettingChange();
+    });
     $('#setBgColor').addEventListener('input', onSettingChange);
+    $('#setBgColor').addEventListener('change', onSettingChange);
     ['setFont', 'setLine', 'setWidth', 'setGoal', 'setAuto'].forEach((id) => $('#' + id).addEventListener('input', onSettingChange));
     $('#setIndent').addEventListener('change', onSettingChange);
     $('#setTypewriter').addEventListener('change', onSettingChange);
@@ -1424,8 +1434,9 @@
       if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
         try { flushChapter(); } catch (er) {}
+        const snapped = takeSnapshot(true);
         scheduleSave();
-        toast('已保存');
+        toast(snapped ? '已保存并生成历史版本' : '已保存');
       }
     });
   }
