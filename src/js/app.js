@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '2.5.4';
+  const APP_VERSION = '2.5.5';
 
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
@@ -1032,9 +1032,11 @@
   }
   function setSeg(id, v) { $$('#' + id + ' button').forEach((b) => b.classList.toggle('active', b.dataset.v === v)); }
   function setRange(id, v, label, suffix) { const el = $('#' + id); if (el) el.value = v; const l = $('#' + label); if (l) l.textContent = v + (suffix || ''); }
-  function onSettingChange() {
-    S.theme = segVal('setTheme'); S.fontFamily = segVal('setFontFamily');
-    S.bg = segVal('setBg') || 'theme'; const bc = $('#setBgColor'); if (bc) S.bgColor = bc.value;
+  function onSettingChange(overrides) {
+    overrides = overrides || {};
+    S.theme = overrides.theme || segVal('setTheme');
+    S.fontFamily = overrides.fontFamily || segVal('setFontFamily');
+    S.bg = overrides.bg || segVal('setBg') || 'theme'; const bc = $('#setBgColor'); if (bc) S.bgColor = bc.value;
     S.fontSize = +$('#setFont').value; S.lineHeight = +$('#setLine').value;
     S.editorWidth = +$('#setWidth').value; S.dailyGoal = +$('#setGoal').value; S.autoSave = +$('#setAuto').value;
     S.indent = $('#setIndent').checked; S.typewriter = $('#setTypewriter').checked; S.snapshot = $('#setSnap').checked;
@@ -1384,15 +1386,15 @@
     // 设置
     $('#settingsClose').addEventListener('click', () => closeDrawer('settingsDrawer'));
     $('#drawerMask').addEventListener('click', () => { $$('.drawer.show').forEach((d) => d.classList.remove('show')); $('#drawerMask').classList.remove('show'); });
-    $('#setTheme').addEventListener('click', (e) => { const b = e.target.closest('button[data-v]'); if (b) onSettingChange(); });
-    $('#setFontFamily').addEventListener('click', (e) => { const b = e.target.closest('button[data-v]'); if (b) onSettingChange(); });
+    $('#setTheme').addEventListener('click', (e) => { const b = e.target.closest('button[data-v]'); if (b) onSettingChange({ theme: b.dataset.v }); });
+    $('#setFontFamily').addEventListener('click', (e) => { const b = e.target.closest('button[data-v]'); if (b) onSettingChange({ fontFamily: b.dataset.v }); });
     $('#setBg').addEventListener('click', (e) => {
       const b = e.target.closest('button[data-v]'); if (!b) return;
       if (b.dataset.v === 'custom') {
         const picker = $('#setBgColor');
         if (picker) { picker.style.display = ''; picker.click(); }
       }
-      onSettingChange();
+      onSettingChange({ bg: b.dataset.v });
     });
     $('#setBgColor').addEventListener('input', onSettingChange);
     $('#setBgColor').addEventListener('change', onSettingChange);
