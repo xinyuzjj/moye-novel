@@ -385,6 +385,8 @@ body.focus-mode .editor-area { background: var(--editor-bg); }
 .drawer-body { flex: 1; overflow: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 16px; }
 .drawer-foot { display: flex; align-items: center; padding: 12px 18px; border-top: 1px solid var(--line); gap: 8px; }
 .drawer.dialog { width: 420px; }
+.drawer.dialog.centered { position: fixed; top: 50%; left: 50%; right: auto; height: auto; transform: translate(-50%, -50%); border-radius: 12px; border: 1px solid var(--line); box-shadow: 0 12px 40px rgba(0,0,0,.16); }
+#confirmMsg { line-height: 1.7; margin: 0; }
 .drawer-title { font-size: 15px; font-weight: 600; border: none; background: transparent; }
 .drawer-textarea, #noteBody {
   width: 100%; min-height: 220px; resize: vertical; background: var(--panel-2); border: 1px solid var(--line);

@@ -76,7 +76,13 @@ const Store = (() => {
   }
 
   function confirm(msg) {
-    return new Promise((res) => res(window.confirm(msg)));
+    return new Promise((res) => {
+      if (typeof window !== 'undefined' && window.MoyeDialogs && window.MoyeDialogs.confirm) {
+        window.MoyeDialogs.confirm(msg).then((r) => res(!!r));
+        return;
+      }
+      res(window.confirm(msg));
+    });
   }
 
   return {

@@ -444,6 +444,38 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- 自定义 Prompt -->
+<div class="drawer dialog centered" id="promptDialog">
+  <div class="drawer-head">
+    <h3 id="promptTitle">输入</h3>
+    <button class="icon-btn tiny" id="promptClose">✕</button>
+  </div>
+  <div class="drawer-body">
+    <input type="text" id="promptInput" class="text-input" placeholder="">
+  </div>
+  <div class="drawer-foot">
+    <span class="spacer"></span>
+    <button class="mini-btn" id="promptCancel">取消</button>
+    <button class="mini-btn primary" id="promptOk">确定</button>
+  </div>
+</div>
+
+<!-- 自定义 Confirm -->
+<div class="drawer dialog centered" id="confirmDialog">
+  <div class="drawer-head">
+    <h3>确认</h3>
+    <button class="icon-btn tiny" id="confirmClose">✕</button>
+  </div>
+  <div class="drawer-body">
+    <p id="confirmMsg">确定执行此操作？</p>
+  </div>
+  <div class="drawer-foot">
+    <span class="spacer"></span>
+    <button class="mini-btn" id="confirmCancel">取消</button>
+    <button class="mini-btn danger" id="confirmOk">确定</button>
+  </div>
+</div>
+
 <!-- 启动错误浮层（默认隐藏，出错时由 app.js 显示） -->
 <div id="bootError" class="boot-error" hidden>
   <div class="be-box">

@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '2.5.0';
+  const APP_VERSION = '2.5.1';
 
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
@@ -1002,6 +1002,26 @@
   function closePopup() { const p = $('#exportMenu'); if (p) p.classList.remove('show'); }
   function toggleOutline() { const p = $('#outlinePanel'); if (p) p.classList.toggle('hidden'); }
 
+  let promptResolve = null, confirmResolve = null;
+  function showPrompt(title, defaultValue) {
+    return new Promise((res) => {
+      promptResolve = res;
+      const d = $('#promptDialog'), inp = $('#promptInput'), t = $('#promptTitle');
+      if (t) t.textContent = title || '输入';
+      if (inp) { inp.value = defaultValue || ''; inp.focus(); inp.select(); }
+      openDrawer('promptDialog');
+    });
+  }
+  function closePrompt(value) { closeDrawer('promptDialog'); if (promptResolve) { const r = promptResolve; promptResolve = null; r(value); } }
+  function showConfirm(msg) {
+    return new Promise((res) => {
+      confirmResolve = res;
+      const m = $('#confirmMsg'); if (m) m.textContent = msg || '确定执行此操作？';
+      openDrawer('confirmDialog');
+    });
+  }
+  function closeConfirm(result) { closeDrawer('confirmDialog'); if (confirmResolve) { const r = confirmResolve; confirmResolve = null; r(result); } }
+
   /* ───────── 侧栏宽度拖拽 ───────── */
   function initResizer() {
     const resizer = $('#outlineResizer'), panel = $('#outlinePanel');
@@ -1187,10 +1207,12 @@
     $('#btnNewChapter').addEventListener('click', newChapter);
     $('#btnNewVolume').addEventListener('click', newVolume);
     $('#tocSearch').addEventListener('input', (e) => { tocFilter = e.target.value; renderTOC(); });
-    $('#tocTree').addEventListener('click', (e) => {
+    $('#tocTree').addEventListener('click', async (e) => {
       const ch = e.target.closest('.toc-chapter'); if (ch) { selectChapter(ch.dataset.id); return; }
       const act = e.target.closest('[data-act]'); if (act && act.dataset.act === 'rename-vol') {
-        const v = activeBook().volumes.find((x) => x.id === act.dataset.id); const name = prompt('分卷名称', v.name); if (name != null) { v.name = name; renderTOC(); scheduleSave(); }
+        const v = activeBook().volumes.find((x) => x.id === act.dataset.id);
+        const name = await showPrompt('分卷名称', v.name);
+        if (name != null) { v.name = name; renderTOC(); scheduleSave(); }
       }
       if (act && act.dataset.act === 'del-vol') deleteVolume(act.dataset.id);
     });
@@ -1199,8 +1221,18 @@
     $('#tocTree').addEventListener('dragleave', onDragLeave);
     $('#tocTree').addEventListener('drop', onDrop);
 
+    // 自定义 prompt / confirm（Electron 不支持原生 window.prompt/confirm）
     $('#btnNewNote').addEventListener('click', () => openNote(null));
     $('#btnRefreshChars').addEventListener('click', refreshCharacters);
+    const promptOk = $('#promptOk'), promptCancel = $('#promptCancel'), promptClose = $('#promptClose'), promptInput = $('#promptInput');
+    if (promptOk) promptOk.addEventListener('click', () => closePrompt(promptInput ? promptInput.value : null));
+    if (promptCancel) promptCancel.addEventListener('click', () => closePrompt(null));
+    if (promptClose) promptClose.addEventListener('click', () => closePrompt(null));
+    if (promptInput) promptInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); closePrompt(promptInput.value); } if (e.key === 'Escape') closePrompt(null); });
+    const confirmOk = $('#confirmOk'), confirmCancel = $('#confirmCancel'), confirmClose = $('#confirmClose');
+    if (confirmOk) confirmOk.addEventListener('click', () => closeConfirm(true));
+    if (confirmCancel) confirmCancel.addEventListener('click', () => closeConfirm(false));
+    if (confirmClose) confirmClose.addEventListener('click', () => closeConfirm(false));
     $('#noteList').addEventListener('click', (e) => {
       const chap = e.target.closest('.ci-chap');
       if (chap) { selectChapter(chap.dataset.id); return; }
@@ -1395,6 +1427,8 @@
     bootLog('加载插件');
     await startPlugins();
     bootLog('启动完成');
+    // 暴露全局对话框（供 store.js 等使用），Electron 下原生 prompt/confirm 不可用
+    try { window.MoyeDialogs = { confirm: showConfirm, prompt: showPrompt }; } catch (e) {}
     // 测试/外部集成钩子（不影响正常使用）
     try { window.__moyeDb = db; window.__testRefreshCharacters = refreshCharacters; } catch (e) {}
   }
