@@ -87,7 +87,22 @@
     const items = listPlugins();
     list.innerHTML = '';
     if (!items.length) {
-      list.innerHTML = '<div class="empty-tip">还没有插件<br>把插件文件夹放到安装目录下的 <b>plugins\\</b> 即可即插即用</div>';
+      list.innerHTML = '<div class="empty-tip" id="pluginsEmpty">还没有插件<br>把插件文件夹放到安装目录下的 <b>plugins\\</b> 即可即插即用</div>' +
+        '<button class="mini-btn" id="btnPluginDiagnose" style="margin-top:12px;width:100%">诊断插件加载</button>' +
+        '<pre id="pluginDiagnoseOut" style="display:none;margin-top:10px;padding:10px;background:#f5f5f5;border-radius:6px;font-size:11px;white-space:pre-wrap;word-break:break-all;max-height:260px;overflow:auto"></pre>';
+      const diagBtn = document.getElementById('btnPluginDiagnose');
+      if (diagBtn && CTX && CTX.electronAPI && CTX.electronAPI.pluginDiagnose) {
+        diagBtn.addEventListener('click', async () => {
+          const out = document.getElementById('pluginDiagnoseOut');
+          try {
+            const info = await CTX.electronAPI.pluginDiagnose();
+            out.textContent = JSON.stringify(info, null, 2);
+          } catch (e) {
+            out.textContent = '诊断失败：' + (e && e.message);
+          }
+          out.style.display = 'block';
+        });
+      }
       return;
     }
     items.forEach((it) => {

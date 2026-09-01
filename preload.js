@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openDataFolder: () => ipcRenderer.invoke('open-data-folder'),
   openPluginsFolder: () => ipcRenderer.invoke('open-plugins-folder'),
   getPlugins: () => ipcRenderer.invoke('get-plugins'),
+  pluginDiagnose: () => ipcRenderer.invoke('plugin-diagnose'),
   pluginFs: (arg) => ipcRenderer.invoke('plugin-fs', arg),
   windowControl: (action) => ipcRenderer.invoke('window-control', action),
   onWindowState: (cb) => ipcRenderer.on('window-state', (_e, state) => cb(state))

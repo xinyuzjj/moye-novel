@@ -2,7 +2,16 @@
 'use strict';
 const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const fsstore = require('./lib/fsstore');
+
+/* 调试日志：写入数据目录，方便排查生产环境问题 */
+function pluginDebugLog(msg) {
+  if (!dataDir) return;
+  const p = path.join(dataDir, 'plugins-debug.log');
+  const line = `[${new Date().toISOString()}] ${msg}\n`;
+  try { fs.appendFileSync(p, line); } catch (e) {}
+}
 
 let mainWin = null;
 let dataDir = null;
@@ -36,38 +45,63 @@ function resolveUserPluginsDir() {
  * 2) 开发时若清单不存在，回退到扫描 src/js/plugins 目录。
  * 3) 用户插件目录（AppData/plugins 与 exe 同级 plugins）运行时扫描。
  * 入口以文本形式回传，渲染进程用内联 <script> 执行，规避 file:// 进 asar 的坑。 */
+function readBuiltinManifest(p) {
+  if (!p || !fs.existsSync(p)) return null;
+  try {
+    const list = JSON.parse(fs.readFileSync(p, 'utf8'));
+    pluginDebugLog('manifest read ok at ' + p + ' count=' + (Array.isArray(list) ? list.length : 'not-array'));
+    return Array.isArray(list) ? list : null;
+  } catch (e) {
+    pluginDebugLog('manifest read error at ' + p + ': ' + e.message);
+    return null;
+  }
+}
+
+function scanBuiltinDir(devDir) {
+  const out = [];
+  try {
+    const names = fs.readdirSync(devDir).filter((n) => {
+      try { return fs.statSync(path.join(devDir, n)).isDirectory(); } catch (e) { return false; }
+    });
+    for (const name of names) {
+      const base = path.join(devDir, name);
+      const mfPath = path.join(base, 'plugin.json');
+      if (!fs.existsSync(mfPath)) continue;
+      let mf; try { mf = JSON.parse(fs.readFileSync(mfPath, 'utf8')); } catch (e) { continue; }
+      if (!mf.id) mf.id = name;
+      const entry = mf.entry || 'index.js';
+      const entryAbs = path.join(base, entry);
+      if (!fs.existsSync(entryAbs)) continue;
+      let entryText = ''; try { entryText = fs.readFileSync(entryAbs, 'utf8'); } catch (e) { continue; }
+      out.push({ manifest: mf, location: 'builtin', entryText });
+    }
+  } catch (e) { pluginDebugLog('builtin dir scan error=' + e.message); }
+  return out;
+}
+
 function scanPlugins() {
+  pluginDebugLog('scanPlugins 开始');
   const out = [];
 
-  // 内置插件：清单优先
-  const manifestPath = path.join(__dirname, 'src', 'builtin-plugins.json');
-  if (fs.existsSync(manifestPath)) {
-    try {
-      const list = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-      if (Array.isArray(list)) out.push(...list);
-    } catch (e) {
-      console.error('[墨页] 读取内置插件清单失败', e);
-    }
+  // 内置插件：尝试多个候选清单路径（app.asar 内 __dirname 行为可能因 Electron 版本/打包方式而异）
+  const candidates = [
+    path.join(__dirname, 'src', 'builtin-plugins.json'),
+    path.join(process.resourcesPath, 'app.asar', 'src', 'builtin-plugins.json'),
+    path.join(path.dirname(app.getPath('exe')), 'resources', 'app.asar', 'src', 'builtin-plugins.json')
+  ];
+  let manifest = null;
+  for (const cp of candidates) {
+    pluginDebugLog('try manifest=' + cp + ' exists=' + fs.existsSync(cp));
+    manifest = readBuiltinManifest(cp);
+    if (manifest) break;
+  }
+  if (manifest) {
+    out.push(...manifest);
   } else {
-    // 开发模式：没有预生成清单，直接扫描目录
+    // 兜底：直接扫描 src/js/plugins 目录（开发模式或清单缺失）
     const devDir = path.join(__dirname, 'src', 'js', 'plugins');
-    try {
-      const names = fs.readdirSync(devDir).filter((n) => {
-        try { return fs.statSync(path.join(devDir, n)).isDirectory(); } catch (e) { return false; }
-      });
-      for (const name of names) {
-        const base = path.join(devDir, name);
-        const mfPath = path.join(base, 'plugin.json');
-        if (!fs.existsSync(mfPath)) continue;
-        let mf; try { mf = JSON.parse(fs.readFileSync(mfPath, 'utf8')); } catch (e) { continue; }
-        if (!mf.id) mf.id = name;
-        const entry = mf.entry || 'index.js';
-        const entryAbs = path.join(base, entry);
-        if (!fs.existsSync(entryAbs)) continue;
-        let entryText = ''; try { entryText = fs.readFileSync(entryAbs, 'utf8'); } catch (e) { continue; }
-        out.push({ manifest: mf, location: 'builtin', entryText });
-      }
-    } catch (e) { console.error('[墨页] 扫描内置插件目录失败', e); }
+    pluginDebugLog('fallback builtin dir=' + devDir + ' exists=' + fs.existsSync(devDir));
+    out.push(...scanBuiltinDir(devDir));
   }
 
   // 用户插件目录：安装位置 plugins/ 优先，AppData/plugins 兜底（Program Files 无写权限时仍可即插即用）
@@ -75,8 +109,9 @@ function scanPlugins() {
     { dir: userPluginsDir },
     { dir: path.join(app.getPath('userData'), 'plugins') }
   ];
-  for (const r of roots) {
-    if (!r.dir || !fs.existsSync(r.dir)) continue;
+  pluginDebugLog('user roots=' + roots.map(r => r.dir).join(' | '));
+    for (const r of roots) {
+    if (!r.dir || !fs.existsSync(r.dir)) { pluginDebugLog('skip root=' + (r && r.dir) + ' exists=' + fs.existsSync(r && r.dir)); continue; }
     let names = [];
     try {
       names = fs.readdirSync(r.dir).filter((n) => {
@@ -98,6 +133,7 @@ function scanPlugins() {
       out.push({ manifest: mf, location: 'user', entryText });
     }
   }
+  pluginDebugLog('scanPlugins result ids=' + out.map(x => x.manifest && x.manifest.id).join(',') + ' total=' + out.length);
   return out;
 }
 
@@ -186,8 +222,36 @@ function registerIpc() {
 
   // 插件：返回插件清单（含入口脚本文本）
   ipcMain.handle('get-plugins', () => {
-    try { return scanPlugins(); }
-    catch (e) { console.error('[墨页] get-plugins 失败', e); return []; }
+    pluginDebugLog('get-plugins invoked');
+    try { const res = scanPlugins(); pluginDebugLog('get-plugins returning ' + res.length); return res; }
+    catch (e) { pluginDebugLog('get-plugins error=' + e.message); console.error('[墨页] get-plugins 失败', e); return []; }
+  });
+
+  // 插件：诊断信息（帮助排查生产环境插件为空）
+  ipcMain.handle('plugin-diagnose', () => {
+    const manifestCandidates = [
+      path.join(__dirname, 'src', 'builtin-plugins.json'),
+      path.join(process.resourcesPath, 'app.asar', 'src', 'builtin-plugins.json'),
+      path.join(path.dirname(app.getPath('exe')), 'resources', 'app.asar', 'src', 'builtin-plugins.json')
+    ];
+    const manifestChecks = manifestCandidates.map((p) => ({ path: p, exists: fs.existsSync(p), size: fs.existsSync(p) ? fs.statSync(p).size : 0 }));
+    const devDir = path.join(__dirname, 'src', 'js', 'plugins');
+    let builtinDirList = [];
+    try { builtinDirList = fs.existsSync(devDir) ? fs.readdirSync(devDir) : []; } catch (e) {}
+    const userRoots = [userPluginsDir, path.join(app.getPath('userData'), 'plugins')];
+    const userRootChecks = userRoots.map((p) => ({ path: p, exists: fs.existsSync(p), list: (() => { try { return fs.existsSync(p) ? fs.readdirSync(p) : []; } catch (e) { return []; } })() }));
+    return {
+      version: app.getVersion(),
+      __dirname,
+      processResourcesPath: process.resourcesPath,
+      exePath: app.getPath('exe'),
+      dataDir,
+      userPluginsDir,
+      manifestChecks,
+      builtinDir: { path: devDir, exists: fs.existsSync(devDir), list: builtinDirList },
+      userRootChecks,
+      scanResult: scanPlugins().map((x) => ({ id: x.manifest && x.manifest.id, location: x.location }))
+    };
   });
 
   // 插件：打开用户插件目录（安装位置下的 plugins/，不存在则尝试创建）
@@ -227,6 +291,7 @@ app.whenReady().then(() => {
   dataDir = resolveDataDir();
   userPluginsDir = resolveUserPluginsDir();
   console.log('[墨页] 数据目录：' + dataDir);
+  pluginDebugLog('startup dataDir=' + dataDir + ' userPluginsDir=' + userPluginsDir + ' __dirname=' + __dirname);
   registerIpc();
   createWindow();
 
