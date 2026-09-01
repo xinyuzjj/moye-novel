@@ -284,6 +284,57 @@ function registerIpc() {
       return { ok: false, error: String(err && err.message || err) };
     }
   });
+
+  // 知识库：连接本地文件夹（Obsidian 库或任意 .md 文件夹），只读访问
+  function walkMarkdownFiles(dir, root, depth, out) {
+    if (depth > 10) return;
+    let ents;
+    try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { return; }
+    for (const ent of ents) {
+      const name = ent.name;
+      if (name === '.obsidian' || name === '.trash' || name === 'node_modules' || name.startsWith('.')) continue;
+      const full = path.join(dir, name);
+      try {
+        if (ent.isDirectory()) walkMarkdownFiles(full, root, depth + 1, out);
+        else if (ent.isFile() && /\.md$/i.test(name)) {
+          const rel = path.relative(root, full).split(path.sep).join('/');
+          let mtime = 0; try { mtime = fs.statSync(full).mtimeMs; } catch (e2) {}
+          out.push({ rel, name: name.replace(/\.md$/i, ''), mtime });
+        }
+      } catch (e) {}
+    }
+  }
+  ipcMain.handle('kb-select-folder', async () => {
+    try {
+      const res = await dialog.showOpenDialog(mainWin, {
+        properties: ['openDirectory'],
+        title: '选择知识库文件夹（Obsidian 库或任意 .md 文件夹）'
+      });
+      if (res.canceled || !res.filePaths || !res.filePaths.length) return { ok: true, path: null };
+      return { ok: true, path: res.filePaths[0] };
+    } catch (err) { return { ok: false, error: String(err && err.message || err) }; }
+  });
+  ipcMain.handle('kb-list', (e, dir) => {
+    try {
+      if (!dir || !fs.existsSync(dir)) return { ok: false, error: 'no-dir' };
+      const out = [];
+      walkMarkdownFiles(dir, dir, 0, out);
+      out.sort((a, b) => a.rel.localeCompare(b.rel));
+      const CAP = 8000;
+      const capped = out.slice(0, CAP);
+      return { ok: true, files: capped, total: out.length, capped: out.length > capped.length };
+    } catch (err) { return { ok: false, error: String(err && err.message || err) }; }
+  });
+  ipcMain.handle('kb-read', (e, arg) => {
+    const { dir, rel } = arg || {};
+    if (!dir || !rel) return { ok: false, error: 'bad-arg' };
+    const full = path.resolve(dir, rel);
+    if (path.relative(dir, full).startsWith('..')) return { ok: false, error: 'forbidden' };
+    try {
+      const content = fs.readFileSync(full, 'utf8');
+      return { ok: true, content, rel, mtime: fs.statSync(full).mtimeMs };
+    } catch (err) { return { ok: false, error: String(err && err.message || err) }; }
+  });
 }
 
 app.whenReady().then(() => {

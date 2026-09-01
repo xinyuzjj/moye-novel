@@ -172,6 +172,7 @@
         <button class="outline-tab" data-tab="character">人物</button>
         <button class="outline-tab" data-tab="world">设定</button>
         <button class="outline-tab" data-tab="idea">灵感</button>
+        <button class="outline-tab" data-tab="kb">知识库</button>
       </div>
       <button class="icon-btn tiny" id="outlineClose" title="收起">›</button>
     </div>
@@ -180,6 +181,21 @@
       <div class="card-area" id="cardArea" hidden>
         <button class="mini-btn primary card-add" id="btnNewCard">＋ 新建卡片</button>
         <div class="card-list" id="cardList"></div>
+      </div>
+    </div>
+    <div class="kb-panel" id="kbPanel" hidden>
+      <div class="kb-toolbar">
+        <button class="mini-btn primary" id="kbConnect">连接文件夹</button>
+        <span class="kb-folder" id="kbFolderLabel" title="">未连接</span>
+      </div>
+      <input type="search" id="kbSearch" class="kb-search" placeholder="搜索笔记名…" autocomplete="off">
+      <div class="kb-list" id="kbList"></div>
+      <div class="kb-view" id="kbView" hidden>
+        <div class="kb-view-head">
+          <button class="mini-btn tiny" id="kbBack">← 列表</button>
+          <span class="kb-view-title" id="kbViewTitle"></span>
+        </div>
+        <div class="kb-view-body markdown-body" id="kbViewBody"></div>
       </div>
     </div>
     <div class="outline-wordcount" id="outlineCount">0 字</div>

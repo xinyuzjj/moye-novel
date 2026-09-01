@@ -17,6 +17,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getPlugins: () => ipcRenderer.invoke('get-plugins'),
   pluginDiagnose: () => ipcRenderer.invoke('plugin-diagnose'),
   pluginFs: (arg) => ipcRenderer.invoke('plugin-fs', arg),
+  kbSelectFolder: () => ipcRenderer.invoke('kb-select-folder'),
+  kbList: (dir) => ipcRenderer.invoke('kb-list', dir),
+  kbRead: (arg) => ipcRenderer.invoke('kb-read', arg),
   windowControl: (action) => ipcRenderer.invoke('window-control', action),
   onWindowState: (cb) => ipcRenderer.on('window-state', (_e, state) => cb(state))
 });

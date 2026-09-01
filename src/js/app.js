@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '2.3.1';
+  const APP_VERSION = '2.4.0';
 
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
@@ -27,7 +27,8 @@
     theme: 'paper', fontSize: 18, lineHeight: 1.9, fontFamily: 'serif',
     editorWidth: 760, dailyGoal: 2000, autoSave: 0.8,
     indent: true, typewriter: false, snapshot: true,
-    autoFormat: true, fmtSpace: true, fmtPunct: true, fmtQuote: true, fmtIndent: true
+    autoFormat: true, fmtSpace: true, fmtPunct: true, fmtQuote: true, fmtIndent: true,
+    kbFolder: ''
   };
   const FONT_MAP = {
     serif: '"Songti SC","Noto Serif SC","Source Han Serif SC","SimSun",Georgia,serif',
@@ -511,13 +512,16 @@
   function currentCardArr() { return (activeBook().cards && activeBook().cards[outlineTab]) || []; }
 
   function renderOutlinePanel() {
-    const ta = $('#outlineBody'), area = $('#cardArea');
+    const ta = $('#outlineBody'), area = $('#cardArea'), kb = $('#kbPanel');
     if (!ta || !area) return;
     if (outlineTab === 'outline') {
-      ta.hidden = false; area.hidden = true;
+      ta.hidden = false; area.hidden = true; if (kb) kb.hidden = true;
       ta.value = activeBook().outline.outline || '';
+    } else if (outlineTab === 'kb') {
+      ta.hidden = true; area.hidden = true; if (kb) kb.hidden = false;
+      renderKb();
     } else {
-      ta.hidden = true; area.hidden = false;
+      ta.hidden = true; area.hidden = false; if (kb) kb.hidden = true;
       renderCards();
     }
     updateOutlineCount();
@@ -529,7 +533,8 @@
   }
   function updateOutlineCount() {
     const c = $('#outlineCount'); if (!c) return;
-    if (outlineTab === 'outline') c.textContent = countWords($('#outlineBody').value) + ' 字';
+    if (outlineTab === 'kb') c.textContent = (kbFiles.length ? kbFiles.length + ' 篇' : '知识库');
+    else if (outlineTab === 'outline') c.textContent = countWords($('#outlineBody').value) + ' 字';
     else c.textContent = currentCardArr().length + ' 张卡片';
   }
 
@@ -607,6 +612,112 @@
   function deleteCard() {
     if (editingCardId) deleteCardById(editingCardId);
     closeDrawer('cardDrawer');
+  }
+
+  /* ───────── 知识库（Obsidian / 本地 .md 文件夹，只读） ───────── */
+  let kbFiles = [], kbRoot = '', kbQuery = '';
+
+  async function renderKb() {
+    const label = $('#kbFolderLabel'), list = $('#kbList'), view = $('#kbView');
+    if (!label || !list) return;
+    kbRoot = (S && S.kbFolder) || '';
+    if (view) view.hidden = true;
+    if (!kbRoot) {
+      label.textContent = '未连接'; label.title = '';
+      list.innerHTML = '<div class="empty-tip">点「连接文件夹」选择 Obsidian 库<br>或任意 .md 笔记文件夹<br><span class="muted">仅本机读取，不联网</span></div>';
+      showKbList(); updateOutlineCount(); return;
+    }
+    label.textContent = shortPath(kbRoot); label.title = kbRoot;
+    list.innerHTML = '<div class="empty-tip">正在读取…</div>';
+    showKbList();
+    try {
+      const r = await window.electronAPI.kbList(kbRoot);
+      if (!r || !r.ok) { list.innerHTML = '<div class="empty-tip">读取失败：' + esc((r && r.error) || '未知错误') + '</div>'; kbFiles = []; updateOutlineCount(); return; }
+      kbFiles = r.files || [];
+      if (r.capped) toast('笔记过多，仅显示前 ' + r.files.length + ' 篇');
+      renderKbList();
+    } catch (e) {
+      list.innerHTML = '<div class="empty-tip">读取异常：' + esc(e.message || '') + '</div>'; kbFiles = [];
+    }
+    updateOutlineCount();
+  }
+  function shortPath(p) {
+    if (!p) return '';
+    const parts = p.split(/[\\/]/); return parts.length > 2 ? parts.slice(-2).join('/') : p;
+  }
+  function renderKbList() {
+    const list = $('#kbList'); if (!list) return;
+    const q = (kbQuery || '').trim().toLowerCase();
+    const items = q ? kbFiles.filter((f) => f.name.toLowerCase().includes(q) || f.rel.toLowerCase().includes(q)) : kbFiles;
+    if (!items.length) { list.innerHTML = '<div class="empty-tip">没有匹配的笔记</div>'; return; }
+    list.innerHTML = items.map((f) => {
+      const folder = f.rel.indexOf('/') >= 0 ? f.rel.slice(0, f.rel.lastIndexOf('/')) : '';
+      return '<div class="kb-item" data-rel="' + esc(f.rel) + '">' +
+        '<div class="kb-item-name">' + esc(f.name) + '</div>' +
+        (folder ? '<div class="kb-item-folder">' + esc(folder) + '</div>' : '') +
+        '</div>';
+    }).join('');
+  }
+  function showKbList() { const l = $('#kbList'), v = $('#kbView'); if (l) l.hidden = false; if (v) v.hidden = true; }
+  function showKbView() { const l = $('#kbList'), v = $('#kbView'); if (l) l.hidden = true; if (v) v.hidden = false; }
+
+  async function kbOpenItem(rel) {
+    const f = kbFiles.find((x) => x.rel === rel); if (!f) return;
+    const titleEl = $('#kbViewTitle'), body = $('#kbViewBody');
+    if (titleEl) titleEl.textContent = f.name;
+    if (body) body.innerHTML = '<div class="empty-tip">加载中…</div>';
+    showKbView();
+    try {
+      const r = await window.electronAPI.kbRead({ dir: kbRoot, rel });
+      if (!r || !r.ok) { if (body) body.innerHTML = '<div class="empty-tip">读取失败：' + esc((r && r.error) || '') + '</div>'; return; }
+      if (body) body.innerHTML = renderMarkdown(r.content);
+    } catch (e) {
+      if (body) body.innerHTML = '<div class="empty-tip">读取异常：' + esc(e.message || '') + '</div>';
+    }
+  }
+
+  // 轻量 Markdown → HTML（安全转义，避免笔记内容注入）
+  function renderMarkdown(md) {
+    if (!md) return '';
+    const lines = md.replace(/\r\n?/g, '\n').split('\n');
+    let html = '', i = 0;
+    function inline(s) {
+      s = esc(s);
+      s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+      s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+      s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+      return s;
+    }
+    while (i < lines.length) {
+      const ln = lines[i];
+      const h = ln.match(/^(#{1,6})\s+(.*)$/);
+      if (h) { const lvl = h[1].length; html += '<h' + lvl + '>' + inline(h[2]) + '</h' + lvl + '>'; i++; continue; }
+      if (/^---+\s*$/.test(ln)) { html += '<hr>'; i++; continue; }
+      if (/^>\s?/.test(ln)) {
+        const buf = [];
+        while (i < lines.length && /^>\s?/.test(lines[i])) { buf.push(inline(lines[i].replace(/^>\s?/, ''))); i++; }
+        html += '<blockquote>' + buf.join('<br>') + '</blockquote>'; continue;
+      }
+      if (/^\s*[-*]\s+/.test(ln)) {
+        const buf = [];
+        while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) { buf.push('<li>' + inline(lines[i].replace(/^\s*[-*]\s+/, '')) + '</li>'); i++; }
+        html += '<ul>' + buf.join('') + '</ul>'; continue;
+      }
+      if (/^\s*\d+\.\s+/.test(ln)) {
+        const buf = [];
+        while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) { buf.push('<li>' + inline(lines[i].replace(/^\s*\d+\.\s+/, '')) + '</li>'); i++; }
+        html += '<ol>' + buf.join('') + '</ol>'; continue;
+      }
+      if (ln.trim() === '') { i++; continue; }
+      const buf = [];
+      while (i < lines.length && lines[i].trim() !== '' && !/^(#{1,6})\s/.test(lines[i]) && !/^>\s?/.test(lines[i]) &&
+             !/^\s*[-*]\s+/.test(lines[i]) && !/^\s*\d+\.\s+/.test(lines[i]) && !/^---+\s*$/.test(lines[i])) {
+        buf.push(inline(lines[i])); i++;
+      }
+      html += '<p>' + buf.join('<br>') + '</p>';
+    }
+    return html;
   }
 
   /* ───────── 历史快照 ───────── */
@@ -1020,6 +1131,20 @@
     $('#cardSave').addEventListener('click', saveCard);
     $('#cardClose').addEventListener('click', () => closeDrawer('cardDrawer'));
     $('#cardDelete').addEventListener('click', deleteCard);
+
+    // 知识库（只读，连接本地 .md 文件夹）
+    $('#kbConnect').addEventListener('click', async () => {
+      if (!window.electronAPI || !window.electronAPI.kbSelectFolder) { toast('知识库仅桌面端支持'); return; }
+      const r = await window.electronAPI.kbSelectFolder();
+      if (!r || !r.ok) { toast('选择失败：' + ((r && r.error) || '')); return; }
+      if (!r.path) return;
+      S.kbFolder = r.path; scheduleSave(); renderKb(); toast('已连接知识库');
+    });
+    $('#kbSearch').addEventListener('input', (e) => { kbQuery = e.target.value || ''; renderKbList(); });
+    $('#kbList').addEventListener('click', (e) => {
+      const it = e.target.closest('.kb-item'); if (it) kbOpenItem(it.dataset.rel);
+    });
+    $('#kbBack').addEventListener('click', () => showKbList());
 
     // 查找
     $('#btnFind') && $('#btnFind').addEventListener('click', () => $('#findBar').classList.add('show'));
