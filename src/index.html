@@ -412,7 +412,25 @@
     <p class="muted">纯本地运行，不联网，你的稿件只存在自己电脑上。</p>
     <p class="muted">基于 Electron 构建 · 纯本地存储，数据在你自己电脑上</p>
     <a class="about-link" href="https://github.com/xinyuzjj/moye-novel" target="_blank" rel="noopener">GitHub：xinyuzjj/moye-novel ↗</a>
+    <button class="mini-btn" id="btnCheckUpdate" style="margin-top:14px">检查更新</button>
     <p class="about-copy">© 峻峻尼 · MIT License</p>
+  </div>
+</div>
+
+<!-- 更新提示对话框 -->
+<div class="drawer dialog centered" id="updateDialog">
+  <div class="drawer-head">
+    <h3>发现新版本</h3>
+    <button class="icon-btn tiny" id="updateClose">✕</button>
+  </div>
+  <div class="drawer-body">
+    <p id="updateMsg" class="update-msg"></p>
+    <div id="updateNotes" class="update-notes"></div>
+  </div>
+  <div class="drawer-foot">
+    <span class="spacer"></span>
+    <button class="mini-btn" id="updateLater">稍后</button>
+    <button class="mini-btn primary" id="updateDownload">立即下载</button>
   </div>
 </div>
 

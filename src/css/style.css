@@ -572,3 +572,8 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .timer-lbl { font-size: 12px; color: var(--ink-soft); margin-top: 4px; }
 .timer-pomo { font-size: 16px; font-weight: 600; color: var(--ink); padding: 8px 10px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; }
 .timer-today { font-size: 14px; color: var(--ink-soft); }
+
+/* 更新提示 */
+.update-msg { line-height: 1.8; color: var(--ink); }
+.update-msg b { color: var(--accent); }
+.update-notes { margin-top: 12px; padding: 12px 14px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; font-size: 12.5px; color: var(--ink-soft); max-height: 180px; overflow: auto; white-space: pre-wrap; line-height: 1.7; }

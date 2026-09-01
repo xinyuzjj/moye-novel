@@ -335,6 +335,64 @@ function registerIpc() {
       return { ok: true, content, rel, mtime: fs.statSync(full).mtimeMs };
     } catch (err) { return { ok: false, error: String(err && err.message || err) }; }
   });
+
+  // 打开外部链接（浏览器）
+  ipcMain.handle('open-external', (e, url) => {
+    try { shell.openExternal(url); return true; } catch (err) { return false; }
+  });
+
+  // 手动检查更新
+  ipcMain.handle('check-update', async () => {
+    await checkForUpdates(true);
+    return true;
+  });
+}
+
+/* ───────── 自动更新检查 ───────── */
+const UPDATE_REPO = 'xinyuzjj/moye-novel';
+const UPDATE_RELEASE_URL = 'https://github.com/xinyuzjj/moye-novel/releases';
+
+function compareVersions(a, b) {
+  const pa = String(a).replace(/^v/, '').split('.').map((n) => parseInt(n, 10) || 0);
+  const pb = String(b).replace(/^v/, '').split('.').map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < 3; i++) {
+    const x = pa[i] || 0, y = pb[i] || 0;
+    if (x > y) return 1;
+    if (x < y) return -1;
+  }
+  return 0;
+}
+
+/* 检查 GitHub Releases 是否有新版本；发现更新时通知渲染进程弹窗。
+ * notify=true 表示手动检查，无更新时给个安静的提示。网络失败/限流/离线都静默忽略，不影响写作。 */
+async function checkForUpdates(notify) {
+  if (!mainWin) return;
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const res = await fetch('https://api.github.com/repos/' + UPDATE_REPO + '/releases/latest', {
+      signal: ctrl.signal,
+      headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'moye-novel' }
+    });
+    clearTimeout(timer);
+    if (!res.ok) return;
+    const data = await res.json();
+    const latest = String(data.tag_name || '').replace(/^v/, '');
+    if (!latest) return;
+    const cur = app.getVersion();
+    if (compareVersions(latest, cur) > 0) {
+      mainWin.webContents.send('update-available', {
+        version: latest,
+        name: data.name || ('v' + latest),
+        notes: data.body || '',
+        url: data.html_url || UPDATE_RELEASE_URL
+      });
+    } else if (notify) {
+      mainWin.webContents.send('update-none');
+    }
+  } catch (e) {
+    if (notify) mainWin.webContents.send('update-error', String(e && e.message || e));
+  }
 }
 
 app.whenReady().then(() => {
@@ -345,6 +403,9 @@ app.whenReady().then(() => {
   pluginDebugLog('startup dataDir=' + dataDir + ' userPluginsDir=' + userPluginsDir + ' __dirname=' + __dirname);
   registerIpc();
   createWindow();
+
+  // 启动后静默检查更新（联网时），有新版会弹窗提示
+  setTimeout(() => { checkForUpdates(false).catch(() => {}); }, 4000);
 
   // 窗口最大化/还原时通知渲染进程更新按钮图标
   mainWin.on('maximize', () => { try { mainWin.webContents.send('window-state', 'maximized'); } catch (e) {} });

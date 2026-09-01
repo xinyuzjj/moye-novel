@@ -21,5 +21,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   kbList: (dir) => ipcRenderer.invoke('kb-list', dir),
   kbRead: (arg) => ipcRenderer.invoke('kb-read', arg),
   windowControl: (action) => ipcRenderer.invoke('window-control', action),
-  onWindowState: (cb) => ipcRenderer.on('window-state', (_e, state) => cb(state))
+  onWindowState: (cb) => ipcRenderer.on('window-state', (_e, state) => cb(state)),
+  checkUpdate: () => ipcRenderer.invoke('check-update'),
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
+  onUpdateAvailable: (cb) => ipcRenderer.on('update-available', (_e, info) => cb(info)),
+  onUpdateResult: (cb) => {
+    ipcRenderer.on('update-none', () => cb('none'));
+    ipcRenderer.on('update-error', (_e, msg) => cb('error', msg));
+  }
 });

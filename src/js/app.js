@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '2.7.1';
+  const APP_VERSION = '2.7.2';
 
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
@@ -1130,6 +1130,19 @@
   }
   function closeConfirm(result) { closeDrawer('confirmDialog'); if (confirmResolve) { const r = confirmResolve; confirmResolve = null; r(result); } }
 
+  /* ───────── 更新提示 ───────── */
+  let pendingUpdateUrl = '';
+  function showUpdateDialog(info) {
+    pendingUpdateUrl = info.url || 'https://github.com/xinyuzjj/moye-novel/releases';
+    const msg = $('#updateMsg');
+    if (msg) msg.innerHTML = '有新版本 <b>v' + info.version + '</b> 可用（当前 v' + APP_VERSION + '）。建议下载更新，获得最新功能与修复。';
+    const notes = $('#updateNotes');
+    if (notes) notes.textContent = info.notes || '';
+    const dl = $('#updateDownload');
+    if (dl) dl.textContent = '前往下载 v' + info.version;
+    openDrawer('updateDialog');
+  }
+
   /* ───────── 侧栏宽度拖拽 ───────── */
   function initResizer() {
     const resizer = $('#outlineResizer'), panel = $('#outlinePanel');
@@ -1295,6 +1308,17 @@
     $('#btnSettings').addEventListener('click', () => { openDrawer('settingsDrawer'); applySettings(); });
     $('#btnAbout').addEventListener('click', () => openDrawer('aboutDialog'));
     $('#aboutClose').addEventListener('click', () => closeDrawer('aboutDialog'));
+    $('#btnCheckUpdate') && $('#btnCheckUpdate').addEventListener('click', () => { if (window.electronAPI && window.electronAPI.checkUpdate) window.electronAPI.checkUpdate(); });
+    $('#updateClose') && $('#updateClose').addEventListener('click', () => closeDrawer('updateDialog'));
+    $('#updateLater') && $('#updateLater').addEventListener('click', () => closeDrawer('updateDialog'));
+    $('#updateDownload') && $('#updateDownload').addEventListener('click', () => { if (pendingUpdateUrl && window.electronAPI && window.electronAPI.openExternal) window.electronAPI.openExternal(pendingUpdateUrl); closeDrawer('updateDialog'); });
+    if (window.electronAPI && window.electronAPI.onUpdateAvailable) {
+      window.electronAPI.onUpdateAvailable((info) => showUpdateDialog(info));
+      window.electronAPI.onUpdateResult((type) => {
+        if (type === 'none') toast('已经是最新版本 🎉');
+        else if (type === 'error') toast('检查更新失败，请稍后再试');
+      });
+    }
 
     // 插件管理
     $('#btnPlugins') && $('#btnPlugins').addEventListener('click', () => { if (window.MoyePlugins && window.MoyePlugins._buildDrawer) window.MoyePlugins._buildDrawer(); openDrawer('pluginsDrawer'); });
