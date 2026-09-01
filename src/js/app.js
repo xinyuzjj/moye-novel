@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '2.4.0';
+  const APP_VERSION = '2.4.1';
 
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
@@ -533,7 +533,10 @@
   }
   function updateOutlineCount() {
     const c = $('#outlineCount'); if (!c) return;
-    if (outlineTab === 'kb') c.textContent = (kbFiles.length ? kbFiles.length + ' 篇' : '知识库');
+    if (outlineTab === 'kb') {
+      const n = kbLocalItems().length + kbFiles.length;
+      c.textContent = n ? n + ' 条资料' : '知识库';
+    }
     else if (outlineTab === 'outline') c.textContent = countWords($('#outlineBody').value) + ' 字';
     else c.textContent = currentCardArr().length + ' 张卡片';
   }
@@ -614,31 +617,45 @@
     closeDrawer('cardDrawer');
   }
 
-  /* ───────── 知识库（Obsidian / 本地 .md 文件夹，只读） ───────── */
+  /* ───────── 知识库（本书资料 + Obsidian / 本地 .md 文件夹，只读） ───────── */
   let kbFiles = [], kbRoot = '', kbQuery = '';
 
+  function kbLocalItems() {
+    const b = activeBook(); if (!b) return [];
+    const items = [];
+    const outline = (b.outline && b.outline.outline) || '';
+    if (outline.trim()) items.push({ type: 'local', kind: 'outline', id: 'outline', name: '本书大纲', folder: '本书资料' });
+    ['character', 'world', 'idea'].forEach((k) => {
+      const arr = (b.cards && b.cards[k]) || [];
+      arr.forEach((c) => {
+        if (c && (c.name || c.desc || c.meta)) {
+          items.push({ type: 'local', kind: 'card', cat: k, id: c.id, name: c.name || '未命名' + CARD_TAB_NAME[k], folder: '本书资料 · ' + CARD_TAB_NAME[k] });
+        }
+      });
+    });
+    return items;
+  }
+
   async function renderKb() {
-    const label = $('#kbFolderLabel'), list = $('#kbList'), view = $('#kbView');
+    const label = $('#kbFolderLabel'), list = $('#kbList');
     if (!label || !list) return;
     kbRoot = (S && S.kbFolder) || '';
-    if (view) view.hidden = true;
     if (!kbRoot) {
-      label.textContent = '未连接'; label.title = '';
-      list.innerHTML = '<div class="empty-tip">点「连接文件夹」选择 Obsidian 库<br>或任意 .md 笔记文件夹<br><span class="muted">仅本机读取，不联网</span></div>';
-      showKbList(); updateOutlineCount(); return;
+      label.textContent = '未连接外部库'; label.title = '';
+    } else {
+      label.textContent = shortPath(kbRoot); label.title = kbRoot;
+      list.innerHTML = '<div class="empty-tip">正在读取…</div>';
+      try {
+        const r = await window.electronAPI.kbList(kbRoot);
+        if (!r || !r.ok) { list.innerHTML = '<div class="empty-tip">读取失败：' + esc((r && r.error) || '未知错误') + '</div>'; kbFiles = []; updateOutlineCount(); return; }
+        kbFiles = r.files || [];
+        if (r.capped) toast('笔记过多，仅显示前 ' + r.files.length + ' 篇');
+      } catch (e) {
+        list.innerHTML = '<div class="empty-tip">读取异常：' + esc(e.message || '') + '</div>'; kbFiles = [];
+        updateOutlineCount(); return;
+      }
     }
-    label.textContent = shortPath(kbRoot); label.title = kbRoot;
-    list.innerHTML = '<div class="empty-tip">正在读取…</div>';
-    showKbList();
-    try {
-      const r = await window.electronAPI.kbList(kbRoot);
-      if (!r || !r.ok) { list.innerHTML = '<div class="empty-tip">读取失败：' + esc((r && r.error) || '未知错误') + '</div>'; kbFiles = []; updateOutlineCount(); return; }
-      kbFiles = r.files || [];
-      if (r.capped) toast('笔记过多，仅显示前 ' + r.files.length + ' 篇');
-      renderKbList();
-    } catch (e) {
-      list.innerHTML = '<div class="empty-tip">读取异常：' + esc(e.message || '') + '</div>'; kbFiles = [];
-    }
+    renderKbList();
     updateOutlineCount();
   }
   function shortPath(p) {
@@ -648,31 +665,87 @@
   function renderKbList() {
     const list = $('#kbList'); if (!list) return;
     const q = (kbQuery || '').trim().toLowerCase();
-    const items = q ? kbFiles.filter((f) => f.name.toLowerCase().includes(q) || f.rel.toLowerCase().includes(q)) : kbFiles;
-    if (!items.length) { list.innerHTML = '<div class="empty-tip">没有匹配的笔记</div>'; return; }
-    list.innerHTML = items.map((f) => {
-      const folder = f.rel.indexOf('/') >= 0 ? f.rel.slice(0, f.rel.lastIndexOf('/')) : '';
-      return '<div class="kb-item" data-rel="' + esc(f.rel) + '">' +
-        '<div class="kb-item-name">' + esc(f.name) + '</div>' +
-        (folder ? '<div class="kb-item-folder">' + esc(folder) + '</div>' : '') +
-        '</div>';
-    }).join('');
+    const locals = kbLocalItems();
+    const localHits = q ? locals.filter((f) => f.name.toLowerCase().includes(q) || f.folder.toLowerCase().includes(q)) : locals;
+    const fileHits = q ? kbFiles.filter((f) => f.name.toLowerCase().includes(q) || f.rel.toLowerCase().includes(q)) : kbFiles;
+    if (!localHits.length && !fileHits.length) { list.innerHTML = '<div class="empty-tip">没有匹配的资料</div>'; return; }
+
+    const html = [];
+    if (localHits.length) {
+      html.push('<div class="kb-group">本书资料</div>');
+      html.push(localHits.map((f) => {
+        return '<div class="kb-item local" data-local="' + esc(f.kind + ':' + (f.cat || '') + ':' + f.id) + '">' +
+          '<div class="kb-item-name">' + esc(f.name) + '</div>' +
+          '<div class="kb-item-folder">' + esc(f.folder) + '</div>' +
+          '</div>';
+      }).join(''));
+    }
+    if (fileHits.length) {
+      html.push('<div class="kb-group">' + (kbRoot ? '外部笔记' : '外部笔记（未连接）') + '</div>');
+      html.push(fileHits.map((f) => {
+        const folder = f.rel.indexOf('/') >= 0 ? f.rel.slice(0, f.rel.lastIndexOf('/')) : '';
+        return '<div class="kb-item" data-rel="' + esc(f.rel) + '">' +
+          '<div class="kb-item-name">' + esc(f.name) + '</div>' +
+          (folder ? '<div class="kb-item-folder">' + esc(folder) + '</div>' : '') +
+          '</div>';
+      }).join(''));
+    }
+    list.innerHTML = html.join('');
   }
-  function showKbList() { const l = $('#kbList'), v = $('#kbView'); if (l) l.hidden = false; if (v) v.hidden = true; }
-  function showKbView() { const l = $('#kbList'), v = $('#kbView'); if (l) l.hidden = true; if (v) v.hidden = false; }
+
+  function kbReaderOpen(title, html) {
+    const t = $('#kbReaderTitle'), b = $('#kbReaderBody');
+    if (t) t.textContent = title || '知识库';
+    if (b) b.innerHTML = html || '';
+    openDrawer('kbReaderDrawer');
+  }
+
+  function renderLocalItem(key) {
+    const b = activeBook(); if (!b) return '<div class="empty-tip">无当前作品</div>';
+    const parts = key.split(':');
+    const kind = parts[0], cat = parts[1] || '', id = parts[2] || '';
+    if (kind === 'outline') {
+      const text = (b.outline && b.outline.outline) || '';
+      if (!text.trim()) return '<div class="empty-tip">本书大纲为空</div>';
+      return '<p class="muted">来源：本书大纲</p>' + renderMarkdown(text);
+    }
+    if (kind === 'card') {
+      const arr = (b.cards && b.cards[cat]) || [];
+      const c = arr.find((x) => x.id === id);
+      if (!c) return '<div class="empty-tip">卡片不存在</div>';
+      let html = '<p class="muted">来源：本书资料 · ' + esc(CARD_TAB_NAME[cat]) + '</p>';
+      html += '<h2>' + esc(c.name || '未命名') + '</h2>';
+      if (c.meta) html += '<p><span class="kb-meta">' + esc(c.meta) + '</span></p>';
+      if (c.tags && c.tags.length) html += '<p>' + c.tags.map((t) => '<span class="tag">' + esc(t) + '</span>').join(' ') + '</p>';
+      html += '<div class="kb-card-desc">' + renderMarkdown(c.desc || '') + '</div>';
+      return html;
+    }
+    return '<div class="empty-tip">未知资料类型</div>';
+  }
+
+  async function kbOpenLocal(key) {
+    const b = activeBook(); if (!b) return;
+    const parts = key.split(':');
+    let title = '本书资料';
+    if (parts[0] === 'outline') title = '本书大纲';
+    else if (parts[0] === 'card') {
+      const arr = (b.cards && b.cards[parts[1]]) || [];
+      const c = arr.find((x) => x.id === parts[2]);
+      title = (c && c.name) ? c.name : '卡片';
+    }
+    kbReaderOpen(title, renderLocalItem(key));
+  }
 
   async function kbOpenItem(rel) {
     const f = kbFiles.find((x) => x.rel === rel); if (!f) return;
-    const titleEl = $('#kbViewTitle'), body = $('#kbViewBody');
-    if (titleEl) titleEl.textContent = f.name;
-    if (body) body.innerHTML = '<div class="empty-tip">加载中…</div>';
-    showKbView();
+    if (!kbRoot) { kbReaderOpen(f.name, '<div class="empty-tip">未连接外部知识库文件夹</div>'); return; }
+    kbReaderOpen(f.name, '<div class="empty-tip">加载中…</div>');
     try {
       const r = await window.electronAPI.kbRead({ dir: kbRoot, rel });
-      if (!r || !r.ok) { if (body) body.innerHTML = '<div class="empty-tip">读取失败：' + esc((r && r.error) || '') + '</div>'; return; }
-      if (body) body.innerHTML = renderMarkdown(r.content);
+      if (!r || !r.ok) { kbReaderOpen(f.name, '<div class="empty-tip">读取失败：' + esc((r && r.error) || '') + '</div>'); return; }
+      kbReaderOpen(f.name, renderMarkdown(r.content));
     } catch (e) {
-      if (body) body.innerHTML = '<div class="empty-tip">读取异常：' + esc(e.message || '') + '</div>';
+      kbReaderOpen(f.name, '<div class="empty-tip">读取异常：' + esc(e.message || '') + '</div>');
     }
   }
 
@@ -1142,9 +1215,11 @@
     });
     $('#kbSearch').addEventListener('input', (e) => { kbQuery = e.target.value || ''; renderKbList(); });
     $('#kbList').addEventListener('click', (e) => {
-      const it = e.target.closest('.kb-item'); if (it) kbOpenItem(it.dataset.rel);
+      const it = e.target.closest('.kb-item'); if (!it) return;
+      if (it.dataset.local) kbOpenLocal(it.dataset.local);
+      else kbOpenItem(it.dataset.rel);
     });
-    $('#kbBack').addEventListener('click', () => showKbList());
+    $('#kbReaderClose').addEventListener('click', () => closeDrawer('kbReaderDrawer'));
 
     // 查找
     $('#btnFind') && $('#btnFind').addEventListener('click', () => $('#findBar').classList.add('show'));

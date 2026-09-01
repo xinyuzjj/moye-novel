@@ -126,8 +126,9 @@ function buildDom(dataDir) {
   await wait(60);
   ok('点击知识库 tab 后面板可见（#kbPanel 未隐藏）', doc4.getElementById('kbPanel') && doc4.getElementById('kbPanel').hidden === false);
   ok('知识库面板含「连接文件夹」按钮', !!doc4.getElementById('kbConnect'));
-  ok('未连接时显示「未连接」提示', doc4.getElementById('kbFolderLabel') && doc4.getElementById('kbFolderLabel').textContent.trim() === '未连接');
+  ok('未连接外部库时显示「未连接外部库」提示', doc4.getElementById('kbFolderLabel') && doc4.getElementById('kbFolderLabel').textContent.trim() === '未连接外部库');
   ok('知识库面板含搜索框与列表', !!doc4.getElementById('kbSearch') && !!doc4.getElementById('kbList'));
+  ok('未连接外部库时仍显示「本书资料」分组', doc4.querySelector('.kb-group') && doc4.querySelector('.kb-group').textContent.trim() === '本书资料');
   dom4.window.close();
 
   try { fs.rmSync(dataDir, { recursive: true, force: true }); } catch (e) {}
