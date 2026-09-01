@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '2.5.5';
+  const APP_VERSION = '2.5.6';
 
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
@@ -26,7 +26,7 @@
   const DEFAULT_SETTINGS = {
     theme: 'paper', fontSize: 18, lineHeight: 1.9, fontFamily: 'serif',
     editorWidth: 760, dailyGoal: 2000, autoSave: 0.8,
-    indent: true, typewriter: false, snapshot: true,
+    indent: true, typewriter: false, snapshot: true, sound: false,
     autoFormat: true, fmtSpace: true, fmtPunct: true, fmtQuote: true, fmtIndent: true,
     kbFolder: '', bg: 'theme', bgColor: '#f7f3ea'
   };
@@ -1014,7 +1014,7 @@
     setRange('setFont', S.fontSize, 'valFont', ''); setRange('setLine', S.lineHeight, 'valLine', '');
     setRange('setWidth', S.editorWidth, 'valWidth', ''); setRange('setGoal', S.dailyGoal, 'valGoal', '');
     setRange('setAuto', S.autoSave, 'valAuto', '');
-    $('#setIndent').checked = !!S.indent; $('#setTypewriter').checked = !!S.typewriter; $('#setSnap').checked = !!S.snapshot;
+    $('#setIndent').checked = !!S.indent; $('#setTypewriter').checked = !!S.typewriter; $('#setSound').checked = !!S.sound; $('#setSnap').checked = !!S.snapshot;
     $('#setAutoFormat').checked = !!S.autoFormat; $('#setFmtSpace').checked = !!S.fmtSpace; $('#setFmtPunct').checked = !!S.fmtPunct; $('#setFmtQuote').checked = !!S.fmtQuote; $('#setFmtIndent').checked = !!S.fmtIndent;
     const dp = $('#dataPath'); if (dp) Store.dataPathText().then((t) => { dp.textContent = t; });
     const av = $('#aboutVersion'); if (av) av.textContent = 'v' + APP_VERSION;
@@ -1039,7 +1039,7 @@
     S.bg = overrides.bg || segVal('setBg') || 'theme'; const bc = $('#setBgColor'); if (bc) S.bgColor = bc.value;
     S.fontSize = +$('#setFont').value; S.lineHeight = +$('#setLine').value;
     S.editorWidth = +$('#setWidth').value; S.dailyGoal = +$('#setGoal').value; S.autoSave = +$('#setAuto').value;
-    S.indent = $('#setIndent').checked; S.typewriter = $('#setTypewriter').checked; S.snapshot = $('#setSnap').checked;
+    S.indent = $('#setIndent').checked; S.typewriter = $('#setTypewriter').checked; S.sound = $('#setSound').checked; S.snapshot = $('#setSnap').checked;
     S.autoFormat = $('#setAutoFormat').checked; S.fmtSpace = $('#setFmtSpace').checked; S.fmtPunct = $('#setFmtPunct').checked; S.fmtQuote = $('#setFmtQuote').checked; S.fmtIndent = $('#setFmtIndent').checked;
     setRange('setFont', S.fontSize, 'valFont', ''); setRange('setLine', S.lineHeight, 'valLine', '');
     setRange('setWidth', S.editorWidth, 'valWidth', ''); setRange('setGoal', S.dailyGoal, 'valGoal', '');
@@ -1049,6 +1049,40 @@
     scheduleSave(); renderStats(); updateGoal();
   }
   function segVal(id) { const a = $('#' + id + ' button.active'); return a ? a.dataset.v : null; }
+
+  /* ───────── 打字音效 ───────── */
+  let audioCtx = null, typingTimer = null, typingInd = null;
+  function initAudio() {
+    if (audioCtx) return;
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audioCtx = null; }
+  }
+  function playKeySound() {
+    if (!S || !S.sound) return;
+    initAudio(); if (!audioCtx) return;
+    if (audioCtx.state === 'suspended') { try { audioCtx.resume(); } catch (e) {} }
+    const t = audioCtx.currentTime, dur = 0.05;
+    const n = Math.floor(audioCtx.sampleRate * dur);
+    const buf = audioCtx.createBuffer(1, n, audioCtx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) { const env = Math.pow(1 - i / n, 3); d[i] = (Math.random() * 2 - 1) * env * 0.5; }
+    const src = audioCtx.createBufferSource(); src.buffer = buf;
+    const bp = audioCtx.createBiquadFilter(); bp.type = 'bandpass';
+    bp.frequency.value = 1700 + Math.random() * 900; bp.Q.value = 0.8;
+    const g = audioCtx.createGain(); g.gain.value = 0.08;
+    src.connect(bp); bp.connect(g); g.connect(audioCtx.destination);
+    src.start(t); src.stop(t + dur);
+  }
+  function showTyping() {
+    if (!typingInd) typingInd = $('#typingIndicator');
+    if (typingInd) typingInd.classList.add('show');
+    if (editor) editor.classList.add('typing');
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(() => {
+      if (typingInd) typingInd.classList.remove('show');
+      if (editor) editor.classList.remove('typing');
+    }, 700);
+  }
+
 
   /* ───────── 抽屉 / 弹层 ───────── */
   function openDrawer(id) { const d = $('#' + id); if (d) d.classList.add('show'); const m = $('#drawerMask'); if (m) m.classList.add('show'); }
@@ -1316,6 +1350,11 @@
       const f = findChapter(curChapterId);
       if (f) { f.ch.html = editor.innerHTML; f.ch.words = countWords(editor.textContent); f.ch.updatedAt = Date.now(); }
       markNonEmpty(); updateWordsLive(); updateCursorInfo(); scheduleSave(); updateGoal();
+      showTyping();
+    });
+    $('#editor').addEventListener('keydown', (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === 'Enter' || e.key === 'Backspace' || e.key === ' ' || (e.key.length === 1)) playKeySound();
     });
     $('#editor').addEventListener('blur', () => { if (S && S.autoFormat) formatCurrentChapter(false); });
 
@@ -1401,6 +1440,7 @@
     ['setFont', 'setLine', 'setWidth', 'setGoal', 'setAuto'].forEach((id) => $('#' + id).addEventListener('input', onSettingChange));
     $('#setIndent').addEventListener('change', onSettingChange);
     $('#setTypewriter').addEventListener('change', onSettingChange);
+    $('#setSound').addEventListener('change', onSettingChange);
     $('#setSnap').addEventListener('change', onSettingChange);
     ['setAutoFormat', 'setFmtSpace', 'setFmtPunct', 'setFmtQuote', 'setFmtIndent'].forEach((id) => $('#' + id).addEventListener('change', onSettingChange));
     $('#btnOpenData').addEventListener('click', async () => { if (!await Store.openDataFolder()) toast('当前为浏览器模式，数据存在 IndexedDB'); });
