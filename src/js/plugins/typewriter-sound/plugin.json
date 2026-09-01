@@ -1,0 +1,9 @@
+{
+  "id": "typewriter-sound",
+  "name": "打字音效",
+  "version": "1.0.0",
+  "description": "写作时实时合成打字音效，6 种音色可选（机械键盘/老式打字机/柔和/木鱼/雨滴/复古游戏），带音量调节与试听。无需音频文件。",
+  "author": "墨页",
+  "entry": "index.js",
+  "builtin": true
+}

@@ -64,9 +64,9 @@ function buildDom(dataDir) {
   await wait(2000);
   ok('启动完成', w.__moyeBootDone === true);
   ok('MoyePlugins 宿主存在', !!w.MoyePlugins);
-  ok('插件清单含 2 个内置插件', w.MoyePlugins && w.MoyePlugins.list().length === 2);
+  ok('插件清单含 3 个内置插件', w.MoyePlugins && w.MoyePlugins.list().length === 3);
   ok('工具栏已注入插件按钮（#pluginTools 非空）', doc.getElementById('pluginTools') && doc.getElementById('pluginTools').children.length >= 1);
-  ok('插件管理抽屉已渲染行（#pluginsList 非空）', doc.getElementById('pluginsList') && doc.getElementById('pluginsList').children.length === 2);
+  ok('插件管理抽屉已渲染行（#pluginsList 非空）', doc.getElementById('pluginsList') && doc.getElementById('pluginsList').children.length === 3);
   // 模拟勾选停用一个插件 → 该插件的工具栏按钮（data-plugin 标记）应被移除
   const before = doc.querySelectorAll('#pluginTools [data-plugin]').length;
   // 直接调用宿主停用接口，验证 deactivate 移除 UI 痕迹
