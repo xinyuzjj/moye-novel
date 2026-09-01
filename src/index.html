@@ -193,6 +193,7 @@
   <span id="stWords">0 字</span>
   <span class="dot">·</span>
   <span id="stCursor">行 1，列 1</span>
+  <span id="stTimer" class="timer-stat" title="写作计时（点击打开）">⏱ 00:00 · +0 字</span>
   <span class="spacer"></span>
   <span id="stGoal">今日 0 / 2000</span>
   <div class="goal-bar"><i id="goalFill"></i></div>
@@ -412,6 +413,34 @@
     <p class="muted">基于 Electron 构建 · 纯本地存储，数据在你自己电脑上</p>
     <a class="about-link" href="https://github.com/xinyuzjj/moye-novel" target="_blank" rel="noopener">GitHub：xinyuzjj/moye-novel ↗</a>
     <p class="about-copy">© 峻峻尼 · MIT License</p>
+  </div>
+</div>
+
+<!-- 写作计时抽屉 -->
+<div class="drawer" id="timerDrawer">
+  <div class="drawer-head">
+    <h3>写作计时</h3>
+    <button class="icon-btn tiny" id="timerClose">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="timer-grid">
+      <div class="timer-cell"><div class="timer-num" id="timerSessionTime">00:00</div><div class="timer-lbl">本次时长</div></div>
+      <div class="timer-cell"><div class="timer-num" id="timerSessionWords">+0 字</div><div class="timer-lbl">本次新增</div></div>
+      <div class="timer-cell"><div class="timer-num" id="timerSpeed">0 字/分</div><div class="timer-lbl">速度</div></div>
+    </div>
+    <div class="set-group">
+      <label class="set-label">番茄钟</label>
+      <div class="timer-pomo" id="timerPomo">专注待开始</div>
+      <div class="tool-row">
+        <button class="mini-btn" id="btnTimerStart">暂停计时</button>
+        <button class="mini-btn" id="btnTimerResetPomo">重置番茄钟</button>
+      </div>
+      <p class="muted">专注 25 分钟，休息 5 分钟，到点自动提醒。</p>
+    </div>
+    <div class="set-group">
+      <label class="set-label">今日累计</label>
+      <div class="timer-today" id="timerToday">今日累计 0m · +0 字</div>
+    </div>
   </div>
 </div>
 

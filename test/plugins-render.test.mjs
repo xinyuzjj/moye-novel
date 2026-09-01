@@ -64,9 +64,9 @@ function buildDom(dataDir) {
   await wait(2000);
   ok('启动完成', w.__moyeBootDone === true);
   ok('MoyePlugins 宿主存在', !!w.MoyePlugins);
-  ok('插件清单含 5 个内置插件', w.MoyePlugins && w.MoyePlugins.list().length === 5);
+  ok('插件清单含 2 个内置插件', w.MoyePlugins && w.MoyePlugins.list().length === 2);
   ok('工具栏已注入插件按钮（#pluginTools 非空）', doc.getElementById('pluginTools') && doc.getElementById('pluginTools').children.length >= 1);
-  ok('插件管理抽屉已渲染行（#pluginsList 非空）', doc.getElementById('pluginsList') && doc.getElementById('pluginsList').children.length === 5);
+  ok('插件管理抽屉已渲染行（#pluginsList 非空）', doc.getElementById('pluginsList') && doc.getElementById('pluginsList').children.length === 2);
   // 模拟勾选停用一个插件 → 该插件的工具栏按钮（data-plugin 标记）应被移除
   const before = doc.querySelectorAll('#pluginTools [data-plugin]').length;
   // 直接调用宿主停用接口，验证 deactivate 移除 UI 痕迹
@@ -75,16 +75,23 @@ function buildDom(dataDir) {
   const after = doc.querySelectorAll('#pluginTools [data-plugin]').length;
   ok('停用插件后其工具栏按钮被移除（数量 -1）', after === before - 1);
 
-  // 打开两个新插件面板，确认 open() 不报错且弹层出现（回归防护）
-  const clickTool = (t) => { const b = Array.prototype.slice.call(doc.querySelectorAll('#pluginTools button')).find((x) => x.textContent.trim() === t); if (b) b.click(); };
+  // 内置写作计时（非插件）：底栏入口 + 抽屉交互（回归防护）
+  ok('内置写作计时入口存在（#stTimer）', !!doc.getElementById('stTimer'));
+  ok('写作计时抽屉存在（#timerDrawer）', !!doc.getElementById('timerDrawer'));
   try {
-    clickTool('文本体检'); await wait(40);
-    ok('文本体检面板可打开（.drawer 出现）', !!doc.querySelector('.drawer'));
-    clickTool('人物图'); await wait(40);
-    ok('人物关系图面板可打开（.drawer 出现）', !!doc.querySelector('.drawer'));
+    const st = doc.getElementById('stTimer'); if (st) st.click();
+    await wait(40);
+    ok('点击计时入口打开计时抽屉', !!doc.getElementById('timerDrawer') && doc.getElementById('timerDrawer').classList.contains('show'));
+    const startBtn = doc.getElementById('btnTimerStart');
+    ok('计时抽屉含开始/暂停按钮', !!startBtn);
+    if (startBtn) {
+      const t0 = startBtn.textContent;
+      startBtn.click(); await wait(20);
+      ok('计时开始/暂停按钮可切换', startBtn.textContent !== t0);
+    }
   } catch (e) {
-    ok('新插件面板可打开', false);
-    console.log('  [debug] 打开面板异常', e.message);
+    ok('写作计时交互正常', false);
+    console.log('  [debug] 计时交互异常', e.message);
   }
   dom.window.close();
   try { fs.rmSync(dataDir, { recursive: true, force: true }); } catch (e) {}

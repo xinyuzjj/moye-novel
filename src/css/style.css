@@ -404,3 +404,13 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .fts-item .fts-ch { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
 .fts-item .fts-sn { font-size: 12px; color: var(--ink-soft); line-height: 1.55; }
 .fts-item .fts-sn mark { background: #ffe9a8; color: inherit; padding: 0 1px; border-radius: 2px; }
+
+/* 写作计时（内置核心功能） */
+.statusbar .timer-stat { cursor: pointer; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+.statusbar .timer-stat:hover { background: var(--sel); border-color: var(--line-strong); }
+.timer-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.timer-cell { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 14px 10px; text-align: center; }
+.timer-num { font-size: 22px; font-weight: 700; color: var(--accent); line-height: 1.2; }
+.timer-lbl { font-size: 12px; color: var(--ink-soft); margin-top: 4px; }
+.timer-pomo { font-size: 16px; font-weight: 600; color: var(--ink); padding: 8px 10px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; }
+.timer-today { font-size: 14px; color: var(--ink-soft); }

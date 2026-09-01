@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '2.3.0';
+  const APP_VERSION = '2.3.1';
 
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
@@ -54,6 +54,79 @@
   let lastSnapAt = 0, snapTimer = null;
   let outlineTab = 'outline', editingNoteId = null, editingNoteCat = 'character';
   let findHits = [], findPos = -1, tocFilter = '';
+
+  /* ───────── 写作计时（内置核心功能，非插件） ───────── */
+  let timer = {
+    running: false, sessionStart: 0, baseWords: 0,
+    lastCommitAt: 0, lastCommitWords: 0,
+    pomoMode: 'work', pomoEndAt: 0, workMin: 25, breakMin: 5, tickId: null
+  };
+  function fmtDur(ms) {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    if (h > 0) return h + 'h' + String(m).padStart(2, '0') + 'm';
+    return String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+  }
+  function timerElapsed() { return timer.running ? (Date.now() - timer.sessionStart) : 0; }
+  function timerNewWords() { return Math.max(0, totalWordsNow() - timer.baseWords); }
+  function timerSpeed() { const ms = timerElapsed(); return ms > 0 ? Math.round(timerNewWords() / (ms / 60000)) : 0; }
+  function commitDaily() {
+    if (!timer.running) return;
+    const now = Date.now(), total = totalWordsNow();
+    const dw = Math.max(0, total - timer.lastCommitWords);
+    const tk = dateKey(new Date());
+    db.timerDaily[tk] = db.timerDaily[tk] || { ms: 0, words: 0 };
+    db.timerDaily[tk].ms += (now - timer.lastCommitAt);
+    db.timerDaily[tk].words += dw;
+    timer.lastCommitAt = now; timer.lastCommitWords = total;
+  }
+  function tickTimer() {
+    if (!timer.running) return;
+    commitDaily();
+    if (timer.pomoEndAt && Date.now() >= timer.pomoEndAt) {
+      if (timer.pomoMode === 'work') { timer.pomoMode = 'break'; timer.pomoEndAt = Date.now() + timer.breakMin * 60000; toast('番茄钟：专注结束，休息一下 ☕'); }
+      else { timer.pomoMode = 'work'; timer.pomoEndAt = Date.now() + timer.workMin * 60000; toast('番茄钟：休息结束，继续写 ✍️'); }
+    }
+    updateTimerUI();
+  }
+  function startStopTimer() {
+    if (timer.running) { commitDaily(); timer.running = false; }
+    else {
+      timer.running = true;
+      timer.sessionStart = Date.now(); timer.baseWords = totalWordsNow();
+      timer.lastCommitAt = Date.now(); timer.lastCommitWords = totalWordsNow();
+      if (!timer.pomoEndAt) { timer.pomoMode = 'work'; timer.pomoEndAt = Date.now() + timer.workMin * 60000; }
+    }
+    if (!timer.tickId) timer.tickId = setInterval(tickTimer, 1000);
+    updateTimerUI();
+  }
+  function resetPomo() {
+    timer.pomoMode = 'work';
+    timer.pomoEndAt = timer.running ? (Date.now() + timer.workMin * 60000) : 0;
+    updateTimerUI();
+  }
+  function updateTimerUI() {
+    const el = $('#stTimer');
+    if (el) el.textContent = '⏱ ' + fmtDur(timerElapsed()) + ' · +' + timerNewWords() + ' 字';
+    const s1 = $('#timerSessionTime'); if (s1) s1.textContent = fmtDur(timerElapsed());
+    const s2 = $('#timerSessionWords'); if (s2) s2.textContent = '+' + timerNewWords() + ' 字';
+    const s3 = $('#timerSpeed'); if (s3) s3.textContent = timerSpeed() + ' 字/分';
+    const pomo = $('#timerPomo');
+    if (pomo) {
+      if (timer.running && timer.pomoEndAt) pomo.textContent = (timer.pomoMode === 'work' ? '专注 ' : '休息 ') + fmtDur(Math.max(0, timer.pomoEndAt - Date.now()));
+      else pomo.textContent = timer.pomoMode === 'work' ? '专注待开始' : '休息待开始';
+    }
+    const today = $('#timerToday');
+    if (today) { const tk = dateKey(new Date()); const c = db.timerDaily[tk] || { ms: 0, words: 0 }; today.textContent = '今日累计 ' + fmtDur(c.ms) + ' · +' + c.words + ' 字'; }
+    const btn = $('#btnTimerStart'); if (btn) btn.textContent = timer.running ? '暂停计时' : '开始计时';
+  }
+  function initTimer() {
+    timer.sessionStart = Date.now(); timer.baseWords = totalWordsNow();
+    timer.lastCommitAt = Date.now(); timer.lastCommitWords = totalWordsNow();
+    timer.running = true; timer.pomoMode = 'work'; timer.pomoEndAt = Date.now() + timer.workMin * 60000;
+    if (!timer.tickId) timer.tickId = setInterval(tickTimer, 1000);
+    updateTimerUI();
+  }
 
   /* ───────── 启动错误浮层 ───────── */
   function installErrorReporter() {
@@ -121,10 +194,11 @@
       settings: Object.assign({}, DEFAULT_SETTINGS), today: { date: dateKey(new Date()), words: 0 }, history: {}
     };
   }
-  function defaultDb() { return { books: [defaultBook()], activeId: null, dayBaseline: 0, today: null, plugins: {} }; }
+  function defaultDb() { return { books: [defaultBook()], activeId: null, dayBaseline: 0, today: null, plugins: {}, timerDaily: {} }; }
   function normalize(d) {
     if (!d.books || !d.books.length) d.books = [defaultBook()];
     d.plugins = (d.plugins && typeof d.plugins === 'object') ? d.plugins : {};
+    d.timerDaily = (d.timerDaily && typeof d.timerDaily === 'object') ? d.timerDaily : {};
     d.books.forEach((b) => {
       b.volumes = b.volumes || [];
       b.notes = b.notes || [];
@@ -982,6 +1056,12 @@
     $('#historyClose').addEventListener('click', () => closeDrawer('historyDrawer'));
     $('#historyList').addEventListener('click', (e) => { const b = e.target.closest('button[data-i]'); if (b) restoreSnapshot(+b.dataset.i); });
 
+    // 写作计时（内置核心功能）
+    $('#stTimer') && $('#stTimer').addEventListener('click', () => { updateTimerUI(); openDrawer('timerDrawer'); });
+    $('#timerClose') && $('#timerClose').addEventListener('click', () => closeDrawer('timerDrawer'));
+    $('#btnTimerStart') && $('#btnTimerStart').addEventListener('click', startStopTimer);
+    $('#btnTimerResetPomo') && $('#btnTimerResetPomo').addEventListener('click', resetPomo);
+
     // 快捷键
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') { document.body.classList.remove('focus-mode'); closePopup(); $$('.drawer.show').forEach((d) => d.classList.remove('show')); $('#drawerMask').classList.remove('show'); }
@@ -1075,6 +1155,7 @@
     renderAll();
     if (S.snapshot) startSnapTimer();
     updateGoal();
+    initTimer();
     bootLog('加载插件');
     await startPlugins();
     bootLog('启动完成');

@@ -1,9 +1,0 @@
-{
-  "id": "writing-timer",
-  "name": "写作计时",
-  "version": "1.0.0",
-  "description": "记录本次写作时长与新增字数、平均速度，支持番茄钟 25/5 专注模式，并累计每日码字数据。",
-  "author": "墨页",
-  "entry": "index.js",
-  "builtin": true
-}
