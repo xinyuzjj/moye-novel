@@ -1,6 +1,6 @@
 {
   "name": "moye-novel",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "private": true,
   "description": "墨页 · 本地轻量小说写作软件（Electron 桌面壳，原生 fs 持久化）",
   "main": "main.js",
@@ -9,7 +9,7 @@
   "scripts": {
     "start": "electron .",
     "dist": "node scripts/build-plugins-manifest.mjs && electron-builder",
-    "test": "node test/plugins.test.mjs && node test/fsstore.test.mjs && node test/format.test.mjs && node test/render-smoke.mjs"
+    "test": "node test/plugins.test.mjs && node test/fsstore.test.mjs && node test/format.test.mjs && node test/render-smoke.mjs && node test/plugins-render.test.mjs"
   },
   "devDependencies": {
     "electron": "^33.0.0",

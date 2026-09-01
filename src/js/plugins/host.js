@@ -104,7 +104,7 @@
       const cb = document.createElement('input');
       cb.type = 'checkbox';
       cb.checked = !!it.enabled;
-      cb.addEventListener('change', () => setEnabled(it.id, cb.checked));
+      cb.addEventListener('change', () => host.setEnabled(it.id, cb.checked));
       toggle.appendChild(cb);
       row.appendChild(main);
       row.appendChild(toggle);
@@ -183,7 +183,8 @@
       await Promise.all(jobs);
       booted = true;
       PLUGINS.forEach((p, id) => { if (p.enabled && p.mod) activate(id); });
-      if (CTX && CTX.emit) CTX.emit('boot', {});
+      // 即使 emit 出错也不影响插件抽屉渲染
+      try { if (CTX && CTX.emit) CTX.emit('boot', {}); } catch (e) { console.error('[插件] emit boot 失败', e); }
       buildDrawer();
     },
     setEnabled(id, on) {

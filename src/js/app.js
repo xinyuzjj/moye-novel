@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '2.1.0';
+  const APP_VERSION = '2.1.1';
 
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
@@ -834,7 +834,7 @@
       // 事件
       on: (ev, fn) => pbus.on(ev, fn),
       off: (ev, fn) => pbus.off(ev, fn),
-      emit: (ev) => { pbus.emit.apply(null, arguments); },
+      emit: (ev, ...rest) => pbus.emit(ev, ...rest),
       // 设置（全局，存 db.plugins）
       getSetting: (k, def) => { const v = db.plugins[k]; return (v === undefined ? def : v); },
       setSetting: (k, v) => { db.plugins[k] = v; scheduleSave(); },
