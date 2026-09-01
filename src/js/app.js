@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '2.5.1';
+  const APP_VERSION = '2.5.2';
 
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
@@ -491,10 +491,17 @@
     const b = activeBook();
     const extracted = extractCharacterNames();
     const existing = new Map((b.characters || []).map((c) => [c.name, c]));
-    b.characters = extracted.map((item) => {
+    const merged = extracted.map((item) => {
       const old = existing.get(item.name) || {};
-      return { id: old.id || uid(), name: item.name, chapterIds: item.chapterIds, count: item.count, ignored: !!old.ignored, updatedAt: Date.now() };
+      return { id: old.id || uid(), name: item.name, chapterIds: item.chapterIds, count: item.count, ignored: !!old.ignored, manual: !!old.manual, updatedAt: Date.now() };
     });
+    // 保留手动添加、但正文中未出现的人名
+    (b.characters || []).forEach((c) => {
+      if (c.manual && !extracted.some((e) => e.name === c.name)) {
+        merged.push({ id: c.id || uid(), name: c.name, chapterIds: c.chapterIds || [], count: c.count || 0, ignored: !!c.ignored, manual: true, updatedAt: Date.now() });
+      }
+    });
+    b.characters = merged;
     renderNotes();
     scheduleSave();
     const visible = b.characters.filter((c) => !c.ignored).length;
@@ -503,6 +510,17 @@
   function ignoreCharacter(id) {
     const b = activeBook(); const c = (b.characters || []).find((x) => x.id === id);
     if (!c) return; c.ignored = true; renderNotes(); scheduleSave();
+  }
+  function addCharacterManual(name) {
+    name = (name || '').trim();
+    if (!name) return false;
+    const b = activeBook();
+    const ex = (b.characters || []).find((c) => c.name === name);
+    if (ex) { ex.manual = true; ex.ignored = false; }
+    else { b.characters.push({ id: uid(), name, chapterIds: [], count: 0, ignored: false, manual: true, updatedAt: Date.now() }); }
+    renderNotes(); scheduleSave();
+    toast('已添加人物：' + name);
+    return true;
   }
 
   function renderNotes() {
@@ -579,6 +597,11 @@
       b.notes.push({ id: uid(), title, body, cat: editingNoteCat, updatedAt: Date.now() });
     }
     renderNotes(); closeDrawer('noteDrawer'); scheduleSave();
+  }
+  function openNoteWithText(text) {
+    editingNoteId = null; editingNoteCat = 'character';
+    $('#noteTitle').value = text || ''; $('#noteBody').value = ''; setSeg('noteCat', 'character');
+    openDrawer('noteDrawer');
   }
   async function deleteNote() {
     if (!editingNoteId) { closeDrawer('noteDrawer'); return; }
@@ -1259,6 +1282,33 @@
       markNonEmpty(); updateWordsLive(); updateCursorInfo(); scheduleSave(); updateGoal();
     });
     $('#editor').addEventListener('blur', () => { if (S && S.autoFormat) formatCurrentChapter(false); });
+
+    // 正文右键菜单（选中文字后弹出：添加为人名 / 存为素材 / 查找此词）
+    const editorMenu = $('#editorMenu');
+    let editorMenuText = '';
+    function hideEditorMenu() { if (editorMenu) editorMenu.classList.remove('show'); }
+    if (editorMenu) {
+      $('#editor').addEventListener('contextmenu', (e) => {
+        const sel = window.getSelection();
+        const text = sel ? sel.toString().trim() : '';
+        if (!text) { hideEditorMenu(); return; }
+        e.preventDefault();
+        editorMenuText = text;
+        editorMenu.style.left = Math.min(e.clientX, window.innerWidth - 160) + 'px';
+        editorMenu.style.top = Math.min(e.clientY, window.innerHeight - 120) + 'px';
+        editorMenu.classList.add('show');
+      });
+      editorMenu.addEventListener('click', (e) => {
+        const it = e.target.closest('.ctx-item'); if (!it) return;
+        const act = it.dataset.act; const text = editorMenuText; hideEditorMenu();
+        if (act === 'add-char') addCharacterManual(text);
+        else if (act === 'add-note') openNoteWithText(text);
+        else if (act === 'find') { const fi = $('#findInput'); if (fi) fi.value = text; $('#findBar').classList.add('show'); findGo(1); }
+      });
+      document.addEventListener('mousedown', (e) => { if (!e.target.closest('#editorMenu')) hideEditorMenu(); });
+      window.addEventListener('blur', hideEditorMenu);
+      $('#editor').addEventListener('scroll', hideEditorMenu);
+    }
     $('#chapterTitle').addEventListener('input', (e) => {
       const f = findChapter(curChapterId); if (f) { f.ch.title = e.target.value; renderTOC(); highlightTOC(); const st = $('#stChapter'); if (st) st.textContent = (f.vol.name ? f.vol.name + ' / ' : '') + (f.ch.title || '未命名'); scheduleSave(); }
     });

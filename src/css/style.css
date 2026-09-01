@@ -466,6 +466,12 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 }
 .toast.show { opacity: .94; transform: translateX(-50%) translateY(0); }
 
+/* 正文右键菜单 */
+.ctx-menu { position: fixed; z-index: 200; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.16); padding: 4px; display: none; min-width: 148px; }
+.ctx-menu.show { display: block; }
+.ctx-item { padding: 8px 14px; font-size: 13px; border-radius: 6px; cursor: pointer; color: var(--ink); white-space: nowrap; }
+.ctx-item:hover { background: var(--sel); }
+
 /* 插件系统 */
 .plugin-tools { display: inline-flex; gap: 6px; align-items: center; }
 .plugin-tools:empty { display: none; }
