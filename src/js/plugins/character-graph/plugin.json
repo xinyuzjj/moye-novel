@@ -1,0 +1,7 @@
+{
+  "id": "character-graph",
+  "name": "人物关系图",
+  "description": "从「人物」卡片提取角色，自动分析全书共现关系，生成可点击跳转到首次出场的关系图谱。",
+  "builtin": true,
+  "entry": "index.js"
+}

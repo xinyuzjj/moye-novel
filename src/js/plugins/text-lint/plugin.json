@@ -1,0 +1,7 @@
+{
+  "id": "text-lint",
+  "name": "文本体检",
+  "description": "检查全书/本章的标点重复、中文间多余空格、半角标点误用、行尾空格等常见排版问题，一键跳转修正。",
+  "builtin": true,
+  "entry": "index.js"
+}
