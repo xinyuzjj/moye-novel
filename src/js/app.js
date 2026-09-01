@@ -403,13 +403,14 @@
     }
     return null;
   }
-  function hideDoneBar() { const bar = $('#chapterDoneBar'); if (bar) bar.hidden = true; }
+  function hideDoneBar() { const bar = $('#chapterDoneBar'); if (bar) bar.hidden = true; document.body.classList.remove('has-done-bar'); const sc = $('#editorScroll'); if (sc) sc.classList.remove('has-done-bar'); }
   function doneChapter() {
     const f = findChapter(curChapterId); if (!f) return;
     f.ch.done = true; renderTOC(); scheduleSave();
     const nx = nextChapterId(curChapterId);
     const msg = $('#doneMsg'); if (msg) msg.textContent = '「' + (f.ch.title || '未命名') + '」已标记完成 🎉';
     const bar = $('#chapterDoneBar'); if (bar) bar.hidden = false;
+    document.body.classList.add('has-done-bar'); const sc = $('#editorScroll'); if (sc) sc.classList.add('has-done-bar');
     const nb = $('#doneNext');
     if (nb) { nb.hidden = false; nb.textContent = nx ? '写下一章 →' : '新建章节 →'; }
     const st = $('#doneStay'); if (st) st.hidden = false;
@@ -698,7 +699,7 @@
     const n = $('#stTodayNum'); if (n) n.innerHTML = '今日已写 <b>' + ts.written + '</b> 字';
     const sub = $('#stTodaySub'); if (sub) sub.textContent = '目标 ' + ts.goal + ' 字' + (ts.over ? ' · 已超额 ' + ts.over + ' 字 🎉' : ' · 还差 ' + ts.remain + ' 字');
     const f = $('#stTodayFill'); if (f) f.style.width = ts.pct + '%';
-    const ex = $('#stTodayExtra'); if (ex) ex.textContent = '当前章节 ' + curWords() + ' 字 · 全书 ' + totalWordsNow() + ' 字';
+    const ex = $('#stTodayExtra'); if (ex) ex.innerHTML = '<span>当前章节 ' + curWords() + ' 字</span><span>全书 ' + totalWordsNow() + ' 字</span>';
   }
   function updateFocusHud() {
     const hud = $('#focusHud'); if (!hud) return;
