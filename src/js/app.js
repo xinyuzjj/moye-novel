@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '2.4.2';
+  const APP_VERSION = '2.4.3';
 
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
@@ -36,7 +36,6 @@
     kai: '"Kaiti SC","KaiTi","STKaiti","Songti SC",serif'
   };
   const NOTE_CAT = { character: '人物', world: '设定', plot: '情节', other: '其他' };
-  const CARD_TAB_NAME = { character: '人物', world: '设定', idea: '灵感' };
 
   /* ───────── 插件事件总线 ───────── */
   const pbus = {
@@ -53,7 +52,7 @@
   let db = null, S = null, curChapterId = null, editor = null;
   let saveTimer = null, dirty = false, saving = false;
   let lastSnapAt = 0, snapTimer = null;
-  let outlineTab = 'outline', editingNoteId = null, editingNoteCat = 'character';
+  let editingNoteId = null, editingNoteCat = 'character';
   let findHits = [], findPos = -1, tocFilter = '';
 
   /* ───────── 写作计时（内置核心功能，非插件） ───────── */
@@ -508,133 +507,17 @@
       '<div class="stat-block"><h4>今日进度</h4><div>已写 ' + (db.today ? db.today.words : 0) + ' / ' + goal + ' 字</div></div>';
   }
 
-  /* ───────── 资料栏（大纲文本 + 人物/设定/灵感 卡片） ───────── */
-  function currentCardArr() { return (activeBook().cards && activeBook().cards[outlineTab]) || []; }
+  /* ───────── 资料栏（现为知识库栏） ───────── */
+  function renderOutlinePanel() { renderKb(); }
 
-  function renderOutlinePanel() {
-    const ta = $('#outlineBody'), area = $('#cardArea'), kb = $('#kbPanel');
-    if (!ta || !area) return;
-    if (outlineTab === 'outline') {
-      ta.hidden = false; area.hidden = true; if (kb) kb.hidden = true;
-      ta.value = activeBook().outline.outline || '';
-    } else if (outlineTab === 'kb') {
-      ta.hidden = true; area.hidden = true; if (kb) kb.hidden = false;
-      renderKb();
-    } else {
-      ta.hidden = true; area.hidden = false; if (kb) kb.hidden = true;
-      renderCards();
-    }
-    updateOutlineCount();
-  }
-  function onOutlineInput() {
-    const ta = $('#outlineBody'); if (!ta) return;
-    activeBook().outline.outline = ta.value;
-    updateOutlineCount(); scheduleSave();
-  }
   function updateOutlineCount() {
-    const c = $('#outlineCount'); if (!c) return;
-    if (outlineTab === 'kb') {
-      const n = kbLocalItems().length + kbFiles.length;
-      c.textContent = n ? n + ' 条资料' : '知识库';
-    }
-    else if (outlineTab === 'outline') c.textContent = countWords($('#outlineBody').value) + ' 字';
-    else c.textContent = currentCardArr().length + ' 张卡片';
-  }
-
-  function renderCards() {
-    const list = $('#cardList'); if (!list) return;
-    const arr = currentCardArr();
-    list.innerHTML = '';
-    if (!arr.length) {
-      list.innerHTML = '<div class="empty-tip">还没有' + (CARD_TAB_NAME[outlineTab] || '卡片') + '<br>点上方「＋ 新建卡片」添加</div>';
-      return;
-    }
-    arr.forEach((c) => {
-      const el = document.createElement('div'); el.className = 'info-card'; el.dataset.id = c.id;
-      const metaHtml = c.meta ? '<span class="ic-meta">' + esc(c.meta) + '</span>' : '';
-      const tagsHtml = (c.tags && c.tags.length)
-        ? '<div class="ic-tags">' + c.tags.map((t) => '<span class="tag">' + esc(t) + '</span>').join('') + '</div>' : '';
-      el.innerHTML =
-        '<div class="ic-top"><span class="ic-name">' + esc(c.name || '未命名') + '</span>' +
-        '<button class="ic-del" data-act="del" title="删除">✕</button></div>' +
-        (metaHtml ? '<div class="ic-meta-row">' + metaHtml + '</div>' : '') +
-        (c.desc ? '<div class="ic-desc">' + esc(c.desc) + '</div>' : '') +
-        tagsHtml;
-      list.appendChild(el);
-    });
-  }
-
-  let editingCardId = null;
-  function openCardEditor(id) {
-    const tab = outlineTab;
-    const labels = {
-      character: { name: '人物姓名', metaLabel: '身份 / 角色', metaPh: '如：男主、反派、配角' },
-      world: { name: '设定名称', metaLabel: '类别', metaPh: '如：世界观、门派、道具' },
-      idea: { name: '灵感标题', metaLabel: '来源 / 触发', metaPh: '如：一段对话、一个画面' }
-    }[tab] || { name: '名称', metaLabel: '标签', metaPh: '' };
-    $('#cardName').placeholder = labels.name;
-    $('#cardMetaLabel').textContent = labels.metaLabel;
-    $('#cardMeta').placeholder = labels.metaPh;
-    const arr = currentCardArr();
-    const c = id ? arr.find((x) => x.id === id) : null;
-    if (c) {
-      editingCardId = c.id;
-      $('#cardName').value = c.name || '';
-      $('#cardMeta').value = c.meta || '';
-      $('#cardTags').value = (c.tags || []).join(', ');
-      $('#cardDesc').value = c.desc || '';
-      $('#cardDelete').style.display = '';
-    } else {
-      editingCardId = null;
-      $('#cardName').value = ''; $('#cardMeta').value = ''; $('#cardTags').value = ''; $('#cardDesc').value = '';
-      $('#cardDelete').style.display = 'none';
-    }
-    openDrawer('cardDrawer');
-  }
-  function saveCard() {
-    const name = $('#cardName').value.trim();
-    const meta = $('#cardMeta').value.trim();
-    const desc = $('#cardDesc').value;
-    const tags = $('#cardTags').value.split(/[,，]/).map((s) => s.trim()).filter(Boolean);
-    const arr = currentCardArr();
-    if (!editingCardId) {
-      if (!name && !meta && !desc.trim()) { closeDrawer('cardDrawer'); return; }
-      arr.push({ id: uid(), name, meta, desc, tags });
-    } else {
-      const c = arr.find((x) => x.id === editingCardId);
-      if (c) { c.name = name; c.meta = meta; c.desc = desc; c.tags = tags; }
-    }
-    renderCards(); updateOutlineCount(); closeDrawer('cardDrawer'); scheduleSave();
-  }
-  function deleteCardById(id) {
-    const arr = currentCardArr();
-    const i = arr.findIndex((x) => x.id === id);
-    if (i >= 0) arr.splice(i, 1);
-    renderCards(); updateOutlineCount(); scheduleSave();
-  }
-  function deleteCard() {
-    if (editingCardId) deleteCardById(editingCardId);
-    closeDrawer('cardDrawer');
+    const c = $('#kbCount'); if (!c) return;
+    const n = kbFiles.length;
+    c.textContent = n ? n + ' 篇笔记' : '知识库';
   }
 
   /* ───────── 知识库（本书资料 + Obsidian / 本地 .md 文件夹，只读） ───────── */
   let kbFiles = [], kbRoot = '', kbQuery = '';
-
-  function kbLocalItems() {
-    const b = activeBook(); if (!b) return [];
-    const items = [];
-    const outline = (b.outline && b.outline.outline) || '';
-    if (outline.trim()) items.push({ type: 'local', kind: 'outline', id: 'outline', name: '本书大纲', folder: '本书资料' });
-    ['character', 'world', 'idea'].forEach((k) => {
-      const arr = (b.cards && b.cards[k]) || [];
-      arr.forEach((c) => {
-        if (c && (c.name || c.desc || c.meta)) {
-          items.push({ type: 'local', kind: 'card', cat: k, id: c.id, name: c.name || '未命名' + CARD_TAB_NAME[k], folder: '本书资料 · ' + CARD_TAB_NAME[k] });
-        }
-      });
-    });
-    return items;
-  }
 
   async function renderKb() {
     const label = $('#kbFolderLabel'), list = $('#kbList');
@@ -665,75 +548,19 @@
   function renderKbList() {
     const list = $('#kbList'); if (!list) return;
     const q = (kbQuery || '').trim().toLowerCase();
-    const locals = kbLocalItems();
-    const localHits = q ? locals.filter((f) => f.name.toLowerCase().includes(q) || f.folder.toLowerCase().includes(q)) : locals;
-    const fileHits = q ? kbFiles.filter((f) => f.name.toLowerCase().includes(q) || f.rel.toLowerCase().includes(q)) : kbFiles;
-    if (!localHits.length && !fileHits.length) { list.innerHTML = '<div class="empty-tip">没有匹配的资料</div>'; return; }
-
-    const html = [];
-    if (localHits.length) {
-      html.push('<div class="kb-group">本书资料</div>');
-      html.push(localHits.map((f) => {
-        return '<div class="kb-item local" data-local="' + esc(f.kind + ':' + (f.cat || '') + ':' + f.id) + '">' +
-          '<div class="kb-item-name">' + esc(f.name) + '</div>' +
-          '<div class="kb-item-folder">' + esc(f.folder) + '</div>' +
-          '</div>';
-      }).join(''));
-    }
-    if (fileHits.length) {
-      html.push('<div class="kb-group">' + (kbRoot ? '外部笔记' : '外部笔记（未连接）') + '</div>');
-      html.push(fileHits.map((f) => {
-        const folder = f.rel.indexOf('/') >= 0 ? f.rel.slice(0, f.rel.lastIndexOf('/')) : '';
-        return '<div class="kb-item" data-rel="' + esc(f.rel) + '">' +
-          '<div class="kb-item-name">' + esc(f.name) + '</div>' +
-          (folder ? '<div class="kb-item-folder">' + esc(folder) + '</div>' : '') +
-          '</div>';
-      }).join(''));
-    }
-    list.innerHTML = html.join('');
+    const hits = q ? kbFiles.filter((f) => f.name.toLowerCase().includes(q) || f.rel.toLowerCase().includes(q)) : kbFiles;
+    if (!hits.length) { list.innerHTML = '<div class="empty-tip">' + (kbRoot ? '没有匹配的笔记' : '点「连接文件夹」选择 Obsidian 库或任意 .md 笔记文件夹') + '</div>'; return; }
+    list.innerHTML = hits.map((f) => {
+      const folder = f.rel.indexOf('/') >= 0 ? f.rel.slice(0, f.rel.lastIndexOf('/')) : '';
+      return '<div class="kb-item" data-rel="' + esc(f.rel) + '">' +
+        '<div class="kb-item-name">' + esc(f.name) + '</div>' +
+        (folder ? '<div class="kb-item-folder">' + esc(folder) + '</div>' : '') +
+        '</div>';
+    }).join('');
   }
 
   function showKbList() { const l = $('#kbList'), v = $('#kbView'); if (l) l.hidden = false; if (v) v.hidden = true; }
   function showKbView() { const l = $('#kbList'), v = $('#kbView'); if (l) l.hidden = true; if (v) v.hidden = false; }
-
-  function renderLocalItem(key) {
-    const b = activeBook(); if (!b) return '<div class="empty-tip">无当前作品</div>';
-    const parts = key.split(':');
-    const kind = parts[0], cat = parts[1] || '', id = parts[2] || '';
-    if (kind === 'outline') {
-      const text = (b.outline && b.outline.outline) || '';
-      if (!text.trim()) return '<div class="empty-tip">本书大纲为空</div>';
-      return '<p class="muted">来源：本书大纲</p>' + renderMarkdown(text);
-    }
-    if (kind === 'card') {
-      const arr = (b.cards && b.cards[cat]) || [];
-      const c = arr.find((x) => x.id === id);
-      if (!c) return '<div class="empty-tip">卡片不存在</div>';
-      let html = '<p class="muted">来源：本书资料 · ' + esc(CARD_TAB_NAME[cat]) + '</p>';
-      html += '<h2>' + esc(c.name || '未命名') + '</h2>';
-      if (c.meta) html += '<p><span class="kb-meta">' + esc(c.meta) + '</span></p>';
-      if (c.tags && c.tags.length) html += '<p>' + c.tags.map((t) => '<span class="tag">' + esc(t) + '</span>').join(' ') + '</p>';
-      html += '<div class="kb-card-desc">' + renderMarkdown(c.desc || '') + '</div>';
-      return html;
-    }
-    return '<div class="empty-tip">未知资料类型</div>';
-  }
-
-  async function kbOpenLocal(key) {
-    const b = activeBook(); if (!b) return;
-    const parts = key.split(':');
-    let title = '本书资料';
-    if (parts[0] === 'outline') title = '本书大纲';
-    else if (parts[0] === 'card') {
-      const arr = (b.cards && b.cards[parts[1]]) || [];
-      const c = arr.find((x) => x.id === parts[2]);
-      title = (c && c.name) ? c.name : '卡片';
-    }
-    const titleEl = $('#kbViewTitle'), body = $('#kbViewBody');
-    if (titleEl) titleEl.textContent = title;
-    if (body) body.innerHTML = renderLocalItem(key);
-    showKbView();
-  }
 
   async function kbOpenItem(rel) {
     const f = kbFiles.find((x) => x.rel === rel); if (!f) return;
@@ -1046,6 +873,40 @@
   function closePopup() { const p = $('#exportMenu'); if (p) p.classList.remove('show'); }
   function toggleOutline() { const p = $('#outlinePanel'); if (p) p.classList.toggle('hidden'); }
 
+  /* ───────── 侧栏宽度拖拽 ───────── */
+  function initResizer() {
+    const resizer = $('#outlineResizer'), panel = $('#outlinePanel');
+    if (!resizer || !panel) return;
+    let resizing = false, startX = 0, startW = 0;
+    resizer.addEventListener('mousedown', (e) => {
+      resizing = true; startX = e.clientX; startW = panel.offsetWidth;
+      resizer.classList.add('dragging'); document.body.style.userSelect = 'none';
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!resizing) return;
+      const w = Math.max(240, Math.min(520, startW - (e.clientX - startX)));
+      panel.style.flexBasis = w + 'px'; panel.style.width = w + 'px';
+      try { localStorage.setItem('moye.kbWidth', String(w)); } catch (e) {}
+    });
+    document.addEventListener('mouseup', () => {
+      if (!resizing) return;
+      resizing = false; resizer.classList.remove('dragging'); document.body.style.userSelect = '';
+    });
+    // 双击重置
+    resizer.addEventListener('dblclick', () => {
+      panel.style.flexBasis = ''; panel.style.width = '';
+      try { localStorage.removeItem('moye.kbWidth'); } catch (e) {}
+    });
+  }
+  function restoreKbWidth() {
+    const panel = $('#outlinePanel'); if (!panel) return;
+    try {
+      const w = parseInt(localStorage.getItem('moye.kbWidth') || '', 10);
+      if (w >= 240 && w <= 520) { panel.style.flexBasis = w + 'px'; panel.style.width = w + 'px'; }
+    } catch (e) {}
+  }
+
   /* ───────── 作品切换 ───────── */
   function renderBookSwitch() {
     const cur = $('#bookCurrent'); if (cur && activeBook()) cur.textContent = activeBook().title || '未命名';
@@ -1230,24 +1091,8 @@
     $('#btnHistory').addEventListener('click', () => { renderHistory(); openDrawer('historyDrawer'); });
     $('#btnFormat').addEventListener('click', () => formatCurrentChapter(true));
 
-    // 资料栏
-    $$('.outline-tab').forEach((t) => t.addEventListener('click', () => {
-      if (outlineTab === 'outline') onOutlineInput(); // 切走前先保存大纲文本
-      $$('.outline-tab').forEach((x) => x.classList.toggle('active', x === t));
-      outlineTab = t.dataset.tab; renderOutlinePanel();
-    }));
-    $('#outlineBody').addEventListener('input', onOutlineInput);
-
-    // 卡片（人物/设定/灵感）
-    $('#btnNewCard').addEventListener('click', () => openCardEditor(null));
-    $('#cardList').addEventListener('click', (e) => {
-      const del = e.target.closest('.ic-del');
-      if (del) { const id = del.closest('.info-card').dataset.id; deleteCardById(id); return; }
-      const card = e.target.closest('.info-card'); if (card) openCardEditor(card.dataset.id);
-    });
-    $('#cardSave').addEventListener('click', saveCard);
-    $('#cardClose').addEventListener('click', () => closeDrawer('cardDrawer'));
-    $('#cardDelete').addEventListener('click', deleteCard);
+    // 知识库栏（可拖拽调整宽度）
+    initResizer();
 
     // 知识库（只读，连接本地 .md 文件夹）
     $('#kbConnect').addEventListener('click', async () => {
@@ -1260,8 +1105,7 @@
     $('#kbSearch').addEventListener('input', (e) => { kbQuery = e.target.value || ''; renderKbList(); });
     $('#kbList').addEventListener('click', (e) => {
       const it = e.target.closest('.kb-item'); if (!it) return;
-      if (it.dataset.local) kbOpenLocal(it.dataset.local);
-      else kbOpenItem(it.dataset.rel);
+      kbOpenItem(it.dataset.rel);
     });
     $('#kbBack').addEventListener('click', () => showKbList());
 
@@ -1397,6 +1241,7 @@
     bindUI();
     bootLog('渲染界面');
     renderAll();
+    restoreKbWidth();
     if (S.snapshot) startSnapTimer();
     updateGoal();
     initTimer();
@@ -1413,6 +1258,7 @@
     try { applySettings(); } catch (e) {}
     try { bindUI(); } catch (e) {}
     try { renderAll(); } catch (e) {}
+    try { restoreKbWidth(); } catch (e) {}
     try { updateGoal(); } catch (e) {}
     if (window.__hideBootSplash) window.__hideBootSplash();
     if (window.__markBootDone) window.__markBootDone();

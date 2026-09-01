@@ -164,26 +164,14 @@
     </div>
   </main>
 
-  <!-- 右侧资料栏 -->
+  <!-- 右侧知识库栏（可拖拽调整宽度） -->
+  <div class="outline-resizer" id="outlineResizer"></div>
   <aside class="outline-panel" id="outlinePanel">
     <div class="outline-head">
-      <div class="outline-tabs" id="outlineTabs">
-        <button class="outline-tab active" data-tab="outline">大纲</button>
-        <button class="outline-tab" data-tab="character">人物</button>
-        <button class="outline-tab" data-tab="world">设定</button>
-        <button class="outline-tab" data-tab="idea">灵感</button>
-        <button class="outline-tab" data-tab="kb">知识库</button>
-      </div>
+      <div class="outline-title">知识库</div>
       <button class="icon-btn tiny" id="outlineClose" title="收起">›</button>
     </div>
-    <div class="outline-content">
-      <textarea class="outline-body" id="outlineBody" placeholder="写下你的故事走向、关键情节点、时间线、伏笔……（自由记录，随写随存）" spellcheck="false"></textarea>
-      <div class="card-area" id="cardArea" hidden>
-        <button class="mini-btn primary card-add" id="btnNewCard">＋ 新建卡片</button>
-        <div class="card-list" id="cardList"></div>
-      </div>
-    </div>
-    <div class="kb-panel" id="kbPanel" hidden>
+    <div class="kb-panel" id="kbPanel">
       <div class="kb-toolbar">
         <button class="mini-btn primary" id="kbConnect">连接文件夹</button>
         <span class="kb-folder" id="kbFolderLabel" title="">未连接</span>
@@ -198,7 +186,7 @@
         <div class="kb-view-body markdown-body" id="kbViewBody"></div>
       </div>
     </div>
-    <div class="outline-wordcount" id="outlineCount">0 字</div>
+    <div class="outline-wordcount" id="kbCount">知识库</div>
   </aside>
 </div>
 
@@ -360,30 +348,6 @@
     <button class="mini-btn danger" id="noteDelete">删除</button>
     <span class="spacer"></span>
     <button class="mini-btn primary" id="noteSave">保存</button>
-  </div>
-</div>
-
-<!-- 卡片编辑抽屉（人物/设定/灵感） -->
-<div class="drawer" id="cardDrawer">
-  <div class="drawer-head">
-    <input type="text" id="cardName" class="drawer-title" placeholder="名称">
-    <button class="icon-btn tiny" id="cardClose">✕</button>
-  </div>
-  <div class="drawer-body">
-    <div class="set-group">
-      <label class="set-label" id="cardMetaLabel">身份 / 角色</label>
-      <input type="text" id="cardMeta" class="text-input" placeholder="如：男主、反派、配角">
-    </div>
-    <div class="set-group">
-      <label class="set-label">标签（逗号分隔）</label>
-      <input type="text" id="cardTags" class="text-input" placeholder="如：冷酷, 背负仇恨">
-    </div>
-    <textarea id="cardDesc" class="drawer-textarea" placeholder="详细描述……" spellcheck="false"></textarea>
-  </div>
-  <div class="drawer-foot">
-    <button class="mini-btn danger" id="cardDelete">删除</button>
-    <span class="spacer"></span>
-    <button class="mini-btn primary" id="cardSave">保存</button>
   </div>
 </div>
 

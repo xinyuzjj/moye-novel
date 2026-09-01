@@ -93,60 +93,17 @@ function buildDom(dataDir) {
   ok('二次启动从磁盘读回改过的书名（数据持久化成立）', reloaded && reloaded.books[0].title === '改过的书名');
   dom2.window.close();
 
-  // 第三阶段：人物卡片功能（端到端模拟界面操作）
+  // 第三阶段：右侧知识库栏（只读，连接本地 .md 文件夹）
   const dom3 = buildDom(dataDir);
   await wait(1600);
   const w3 = dom3.window, doc3 = w3.document;
-  const charTab = [...doc3.querySelectorAll('.outline-tab')].find((t) => t.dataset.tab === 'character');
-  charTab.dispatchEvent(new w3.MouseEvent('click', { bubbles: true }));
-  doc3.getElementById('btnNewCard').dispatchEvent(new w3.MouseEvent('click', { bubbles: true }));
-  doc3.getElementById('cardName').value = '林惊羽';
-  doc3.getElementById('cardMeta').value = '男主';
-  doc3.getElementById('cardDesc').value = '外表冷峻，内心温柔。';
-  doc3.getElementById('cardTags').value = '冷酷, 背负仇恨';
-  doc3.getElementById('cardSave').dispatchEvent(new w3.MouseEvent('click', { bubbles: true }));
-  await wait(1600); // 等自动保存落盘
-  const card = doc3.querySelector('#cardList .info-card');
-  ok('人物卡片已渲染到资料栏列表', !!card);
-  ok('卡片显示姓名', card && card.querySelector('.ic-name').textContent === '林惊羽');
-  ok('卡片显示身份标签', card && card.querySelector('.ic-meta') && card.querySelector('.ic-meta').textContent === '男主');
-  const persistedCards = fsstore.loadNovels(dataDir);
-  ok('人物卡片已持久化到磁盘', persistedCards.books[0].cards.character.length === 1 &&
-    persistedCards.books[0].cards.character[0].name === '林惊羽' &&
-    persistedCards.books[0].cards.character[0].tags.join() === '冷酷,背负仇恨');
+  ok('右侧存在知识库栏标题「知识库」', !!doc3.querySelector('.outline-title') && doc3.querySelector('.outline-title').textContent.trim() === '知识库');
+  ok('右侧知识库面板直接可见（#kbPanel 未隐藏）', doc3.getElementById('kbPanel') && doc3.getElementById('kbPanel').hidden === false);
+  ok('右侧存在宽度拖拽条（.outline-resizer）', !!doc3.getElementById('outlineResizer'));
+  ok('知识库面板含「连接文件夹」按钮', !!doc3.getElementById('kbConnect'));
+  ok('未连接外部库时显示「未连接外部库」提示', doc3.getElementById('kbFolderLabel') && doc3.getElementById('kbFolderLabel').textContent.trim() === '未连接外部库');
+  ok('知识库面板含搜索框与列表', !!doc3.getElementById('kbSearch') && !!doc3.getElementById('kbList'));
   dom3.window.close();
-
-  // 给默认书预置一点大纲内容，用于验证知识库「本书资料」
-  const preset = fsstore.loadNovels(dataDir);
-  if (preset && preset.books && preset.books[0]) {
-    preset.books[0].outline = preset.books[0].outline || {};
-    preset.books[0].outline.outline = '## 主线\n主角历经磨难，最终复仇。\n\n## 伏笔\n戒指里的老人身份成谜。';
-    fsstore.saveNovels(dataDir, preset);
-  }
-
-  // 第四阶段：知识库面板（只读，连接本地 .md 文件夹）
-  const dom4 = buildDom(dataDir);
-  await wait(1600);
-  const w4 = dom4.window, doc4 = w4.document;
-  const kbTab = [...doc4.querySelectorAll('.outline-tab')].find((t) => t.dataset.tab === 'kb');
-  ok('资料栏含「知识库」tab', !!kbTab);
-  kbTab.dispatchEvent(new w4.MouseEvent('click', { bubbles: true }));
-  await wait(60);
-  ok('点击知识库 tab 后面板可见（#kbPanel 未隐藏）', doc4.getElementById('kbPanel') && doc4.getElementById('kbPanel').hidden === false);
-  ok('知识库面板含「连接文件夹」按钮', !!doc4.getElementById('kbConnect'));
-  ok('未连接外部库时显示「未连接外部库」提示', doc4.getElementById('kbFolderLabel') && doc4.getElementById('kbFolderLabel').textContent.trim() === '未连接外部库');
-  ok('知识库面板含搜索框与列表', !!doc4.getElementById('kbSearch') && !!doc4.getElementById('kbList'));
-  ok('未连接外部库时仍显示「本书资料」分组', doc4.querySelector('.kb-group') && doc4.querySelector('.kb-group').textContent.trim() === '本书资料');
-  const outlineItem = doc4.querySelector('.kb-item[data-local^="outline"]');
-  if (outlineItem) {
-    outlineItem.dispatchEvent(new w4.MouseEvent('click', { bubbles: true }));
-    await wait(40);
-    ok('点击本书大纲后知识库详情面板显示', doc4.getElementById('kbView') && doc4.getElementById('kbView').hidden === false);
-    ok('知识库详情标题显示“本书大纲”', doc4.getElementById('kbViewTitle') && doc4.getElementById('kbViewTitle').textContent.trim() === '本书大纲');
-  } else {
-    ok('存在本书大纲条目', false);
-  }
-  dom4.window.close();
 
   try { fs.rmSync(dataDir, { recursive: true, force: true }); } catch (e) {}
   console.log('\n结果：' + pass + ' 通过 / ' + fail + ' 失败');
