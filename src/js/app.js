@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '2.4.1';
+  const APP_VERSION = '2.4.2';
 
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
@@ -693,12 +693,8 @@
     list.innerHTML = html.join('');
   }
 
-  function kbReaderOpen(title, html) {
-    const t = $('#kbReaderTitle'), b = $('#kbReaderBody');
-    if (t) t.textContent = title || '知识库';
-    if (b) b.innerHTML = html || '';
-    openDrawer('kbReaderDrawer');
-  }
+  function showKbList() { const l = $('#kbList'), v = $('#kbView'); if (l) l.hidden = false; if (v) v.hidden = true; }
+  function showKbView() { const l = $('#kbList'), v = $('#kbView'); if (l) l.hidden = true; if (v) v.hidden = false; }
 
   function renderLocalItem(key) {
     const b = activeBook(); if (!b) return '<div class="empty-tip">无当前作品</div>';
@@ -733,19 +729,25 @@
       const c = arr.find((x) => x.id === parts[2]);
       title = (c && c.name) ? c.name : '卡片';
     }
-    kbReaderOpen(title, renderLocalItem(key));
+    const titleEl = $('#kbViewTitle'), body = $('#kbViewBody');
+    if (titleEl) titleEl.textContent = title;
+    if (body) body.innerHTML = renderLocalItem(key);
+    showKbView();
   }
 
   async function kbOpenItem(rel) {
     const f = kbFiles.find((x) => x.rel === rel); if (!f) return;
-    if (!kbRoot) { kbReaderOpen(f.name, '<div class="empty-tip">未连接外部知识库文件夹</div>'); return; }
-    kbReaderOpen(f.name, '<div class="empty-tip">加载中…</div>');
+    const titleEl = $('#kbViewTitle'), body = $('#kbViewBody');
+    if (titleEl) titleEl.textContent = f.name;
+    if (body) body.innerHTML = '<div class="empty-tip">加载中…</div>';
+    showKbView();
+    if (!kbRoot) { if (body) body.innerHTML = '<div class="empty-tip">未连接外部知识库文件夹</div>'; return; }
     try {
       const r = await window.electronAPI.kbRead({ dir: kbRoot, rel });
-      if (!r || !r.ok) { kbReaderOpen(f.name, '<div class="empty-tip">读取失败：' + esc((r && r.error) || '') + '</div>'); return; }
-      kbReaderOpen(f.name, renderMarkdown(r.content));
+      if (!r || !r.ok) { if (body) body.innerHTML = '<div class="empty-tip">读取失败：' + esc((r && r.error) || '') + '</div>'; return; }
+      if (body) body.innerHTML = renderMarkdown(r.content);
     } catch (e) {
-      kbReaderOpen(f.name, '<div class="empty-tip">读取异常：' + esc(e.message || '') + '</div>');
+      if (body) body.innerHTML = '<div class="empty-tip">读取异常：' + esc(e.message || '') + '</div>';
     }
   }
 
@@ -757,16 +759,51 @@
     function inline(s) {
       s = esc(s);
       s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+      s = s.replace(/~~([^~]+)~~/g, '<del>$1</del>');
       s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
       s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
       s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
       return s;
     }
+    function isBlockStart(idx) {
+      const l = lines[idx];
+      return /^(#{1,6})\s/.test(l) || /^---+$/.test(l) || /^>\s?/.test(l) || /^\s*[-*]\s+/.test(l) || /^\s*\d+\.\s+/.test(l) || /^```/.test(l) || /^\|/.test(l) || l.trim() === '';
+    }
+    function parseTable(start) {
+      const rows = [];
+      let j = start;
+      while (j < lines.length && /^\|/.test(lines[j])) { rows.push(lines[j]); j++; }
+      if (rows.length < 2) return null;
+      const header = rows[0].split('|').map((c) => c.trim()).filter((_, idx, arr) => idx !== 0 && idx !== arr.length - 1);
+      const align = rows[1].split('|').map((c) => c.trim()).filter((_, idx, arr) => idx !== 0 && idx !== arr.length - 1).map((c) => {
+        if (/^:-+:$/.test(c)) return 'center';
+        if (/^-+:$/.test(c)) return 'right';
+        return 'left';
+      });
+      if (header.length === 0) return null;
+      const body = rows.slice(2).map((r) => r.split('|').map((c) => c.trim()).filter((_, idx, arr) => idx !== 0 && idx !== arr.length - 1));
+      let h = '<thead><tr>' + header.map((c, idx) => '<th style="text-align:' + (align[idx] || 'left') + '">' + inline(c) + '</th>').join('') + '</tr></thead>';
+      let b = '<tbody>' + body.map((r) => '<tr>' + r.map((c, idx) => '<td style="text-align:' + (align[idx] || 'left') + '">' + inline(c) + '</td>').join('') + '</tr>').join('') + '</tbody>';
+      return { html: '<table class="md-table">' + h + b + '</table>', next: j };
+    }
     while (i < lines.length) {
       const ln = lines[i];
       const h = ln.match(/^(#{1,6})\s+(.*)$/);
       if (h) { const lvl = h[1].length; html += '<h' + lvl + '>' + inline(h[2]) + '</h' + lvl + '>'; i++; continue; }
-      if (/^---+\s*$/.test(ln)) { html += '<hr>'; i++; continue; }
+      if (/^---+$/.test(ln)) { html += '<hr>'; i++; continue; }
+      if (/^```/.test(ln)) {
+        const lang = ln.slice(3).trim();
+        const buf = [];
+        i++;
+        while (i < lines.length && !/^```/.test(lines[i])) { buf.push(esc(lines[i])); i++; }
+        html += '<pre><code' + (lang ? ' class="lang-' + esc(lang) + '"' : '') + '>' + buf.join('\n') + '</code></pre>';
+        if (i < lines.length && /^```/.test(lines[i])) i++;
+        continue;
+      }
+      if (/^\|/.test(ln)) {
+        const t = parseTable(i);
+        if (t) { html += t.html; i = t.next; continue; }
+      }
       if (/^>\s?/.test(ln)) {
         const buf = [];
         while (i < lines.length && /^>\s?/.test(lines[i])) { buf.push(inline(lines[i].replace(/^>\s?/, ''))); i++; }
@@ -774,7 +811,17 @@
       }
       if (/^\s*[-*]\s+/.test(ln)) {
         const buf = [];
-        while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) { buf.push('<li>' + inline(lines[i].replace(/^\s*[-*]\s+/, '')) + '</li>'); i++; }
+        while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) {
+          const raw = lines[i].replace(/^\s*[-*]\s+/, '');
+          const task = raw.match(/^\[([ x])\]\s+(.*)$/i);
+          if (task) {
+            const checked = task[1].toLowerCase() === 'x' ? ' checked' : '';
+            buf.push('<li><label class="task-label"><input type="checkbox" disabled' + checked + '> ' + inline(task[2]) + '</label></li>');
+          } else {
+            buf.push('<li>' + inline(raw) + '</li>');
+          }
+          i++;
+        }
         html += '<ul>' + buf.join('') + '</ul>'; continue;
       }
       if (/^\s*\d+\.\s+/.test(ln)) {
@@ -784,10 +831,7 @@
       }
       if (ln.trim() === '') { i++; continue; }
       const buf = [];
-      while (i < lines.length && lines[i].trim() !== '' && !/^(#{1,6})\s/.test(lines[i]) && !/^>\s?/.test(lines[i]) &&
-             !/^\s*[-*]\s+/.test(lines[i]) && !/^\s*\d+\.\s+/.test(lines[i]) && !/^---+\s*$/.test(lines[i])) {
-        buf.push(inline(lines[i])); i++;
-      }
+      while (i < lines.length && !isBlockStart(i)) { buf.push(inline(lines[i])); i++; }
       html += '<p>' + buf.join('<br>') + '</p>';
     }
     return html;
@@ -1219,7 +1263,7 @@
       if (it.dataset.local) kbOpenLocal(it.dataset.local);
       else kbOpenItem(it.dataset.rel);
     });
-    $('#kbReaderClose').addEventListener('click', () => closeDrawer('kbReaderDrawer'));
+    $('#kbBack').addEventListener('click', () => showKbList());
 
     // 查找
     $('#btnFind') && $('#btnFind').addEventListener('click', () => $('#findBar').classList.add('show'));

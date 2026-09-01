@@ -116,6 +116,14 @@ function buildDom(dataDir) {
     persistedCards.books[0].cards.character[0].tags.join() === '冷酷,背负仇恨');
   dom3.window.close();
 
+  // 给默认书预置一点大纲内容，用于验证知识库「本书资料」
+  const preset = fsstore.loadNovels(dataDir);
+  if (preset && preset.books && preset.books[0]) {
+    preset.books[0].outline = preset.books[0].outline || {};
+    preset.books[0].outline.outline = '## 主线\n主角历经磨难，最终复仇。\n\n## 伏笔\n戒指里的老人身份成谜。';
+    fsstore.saveNovels(dataDir, preset);
+  }
+
   // 第四阶段：知识库面板（只读，连接本地 .md 文件夹）
   const dom4 = buildDom(dataDir);
   await wait(1600);
@@ -129,6 +137,15 @@ function buildDom(dataDir) {
   ok('未连接外部库时显示「未连接外部库」提示', doc4.getElementById('kbFolderLabel') && doc4.getElementById('kbFolderLabel').textContent.trim() === '未连接外部库');
   ok('知识库面板含搜索框与列表', !!doc4.getElementById('kbSearch') && !!doc4.getElementById('kbList'));
   ok('未连接外部库时仍显示「本书资料」分组', doc4.querySelector('.kb-group') && doc4.querySelector('.kb-group').textContent.trim() === '本书资料');
+  const outlineItem = doc4.querySelector('.kb-item[data-local^="outline"]');
+  if (outlineItem) {
+    outlineItem.dispatchEvent(new w4.MouseEvent('click', { bubbles: true }));
+    await wait(40);
+    ok('点击本书大纲后知识库详情面板显示', doc4.getElementById('kbView') && doc4.getElementById('kbView').hidden === false);
+    ok('知识库详情标题显示“本书大纲”', doc4.getElementById('kbViewTitle') && doc4.getElementById('kbViewTitle').textContent.trim() === '本书大纲');
+  } else {
+    ok('存在本书大纲条目', false);
+  }
   dom4.window.close();
 
   try { fs.rmSync(dataDir, { recursive: true, force: true }); } catch (e) {}

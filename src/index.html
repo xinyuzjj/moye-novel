@@ -190,6 +190,13 @@
       </div>
       <input type="search" id="kbSearch" class="kb-search" placeholder="搜索笔记名…" autocomplete="off">
       <div class="kb-list" id="kbList"></div>
+      <div class="kb-view" id="kbView" hidden>
+        <div class="kb-view-head">
+          <button class="mini-btn tiny" id="kbBack">← 列表</button>
+          <span class="kb-view-title" id="kbViewTitle"></span>
+        </div>
+        <div class="kb-view-body markdown-body" id="kbViewBody"></div>
+      </div>
     </div>
     <div class="outline-wordcount" id="outlineCount">0 字</div>
   </aside>
@@ -468,14 +475,6 @@
   </div>
 </div>
 
-<!-- 知识库阅读抽屉（宽面板，解决侧边栏显示太小） -->
-<div class="drawer wide" id="kbReaderDrawer">
-  <div class="drawer-head">
-    <h3 id="kbReaderTitle">知识库</h3>
-    <button class="icon-btn tiny" id="kbReaderClose">✕</button>
-  </div>
-  <div class="drawer-body markdown-body" id="kbReaderBody"></div>
-</div>
 
 <div class="toast" id="toast"></div>
 
