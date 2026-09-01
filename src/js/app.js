@@ -335,7 +335,7 @@
         chs.forEach((c) => {
           shownCh++;
           const item = document.createElement('div');
-          item.className = 'toc-chapter' + (c.id === curChapterId ? ' selected' : '') + (c.done ? ' done' : '');
+          item.className = 'toc-chapter' + (c.id === curChapterId ? ' selected' : '');
           item.draggable = true; item.dataset.type = 'chapter'; item.dataset.id = c.id;
           item.innerHTML = '<span class="ch-title">' + esc(c.title || '未命名') + '</span>' +
             '<span class="ch-words">' + (c.words || 0) + '</span>';
@@ -356,7 +356,6 @@
   /* ───────── 章节操作 ───────── */
   function selectChapter(id) {
     if (curChapterId && id !== curChapterId) flushChapter();
-    hideDoneBar();
     const f = findChapter(id); if (!f) return;
     curChapterId = id;
     editor.innerHTML = f.ch.html || '';
@@ -391,30 +390,6 @@
     const v = { id: uid(), name: '新分卷', collapsed: false, chapters: [] };
     b.volumes.push(v);
     renderTOC(); scheduleSave(); toast('已新建分卷');
-  }
-  function nextChapterId(id) {
-    const b = activeBook();
-    let hit = false;
-    for (const v of b.volumes) {
-      for (const c of v.chapters) {
-        if (hit) return c.id;
-        if (c.id === id) hit = true;
-      }
-    }
-    return null;
-  }
-  function hideDoneBar() { const bar = $('#chapterDoneBar'); if (bar) bar.hidden = true; document.body.classList.remove('has-done-bar'); const sc = $('#editorScroll'); if (sc) sc.classList.remove('has-done-bar'); }
-  function doneChapter() {
-    const f = findChapter(curChapterId); if (!f) return;
-    f.ch.done = true; renderTOC(); scheduleSave();
-    const nx = nextChapterId(curChapterId);
-    const msg = $('#doneMsg'); if (msg) msg.textContent = '「' + (f.ch.title || '未命名') + '」已标记完成 🎉';
-    const bar = $('#chapterDoneBar'); if (bar) bar.hidden = false;
-    document.body.classList.add('has-done-bar'); const sc = $('#editorScroll'); if (sc) sc.classList.add('has-done-bar');
-    const nb = $('#doneNext');
-    if (nb) { nb.hidden = false; nb.textContent = nx ? '写下一章 →' : '新建章节 →'; }
-    const st = $('#doneStay'); if (st) st.hidden = false;
-    toast('本章已完成，去写下一章吧');
   }
   async function deleteChapter(id) {
     const f = findChapter(id); if (!f) return;
@@ -1340,10 +1315,6 @@
     }));
     $('#btnNewChapter').addEventListener('click', newChapter);
     $('#btnNewVolume').addEventListener('click', newVolume);
-    $('#btnDoneChapter').addEventListener('click', doneChapter);
-    $('#doneNext').addEventListener('click', () => { const nx = nextChapterId(curChapterId); hideDoneBar(); if (nx) selectChapter(nx); else newChapter(); });
-    $('#doneNew').addEventListener('click', () => { hideDoneBar(); newChapter(); });
-    $('#doneStay').addEventListener('click', hideDoneBar);
     $('#tocSearch').addEventListener('input', (e) => { tocFilter = e.target.value; renderTOC(); });
     $('#tocTree').addEventListener('click', async (e) => {
       const ch = e.target.closest('.toc-chapter'); if (ch) { selectChapter(ch.dataset.id); return; }

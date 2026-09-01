@@ -142,7 +142,6 @@
       <input type="text" id="chapterTitle" class="chapter-title" placeholder="章节标题" autocomplete="off">
       <div class="chapter-meta">
         <span id="pluginTools" class="plugin-tools"></span>
-        <button class="mini-btn primary" id="btnDoneChapter" title="标记本章已完成，可选择写下一章">完成本章</button>
         <button class="mini-btn" id="btnFormat" title="自动排版当前章节 (Ctrl+Shift+F)">排版</button>
         <button class="mini-btn" id="btnHistory" title="历史版本">历史</button>
         <button class="mini-btn icon-del" id="btnDelChapter" title="删除本章" aria-label="删除本章">🗑</button>
@@ -153,15 +152,6 @@
       <div id="editor" class="editor is-empty" contenteditable="true" spellcheck="false"
            data-placeholder="从这里开始写你的故事…"></div>
       <div class="typing-indicator" id="typingIndicator">⌨ 正在输入…</div>
-    </div>
-
-    <!-- 完成本章后选择下一章 -->
-    <div class="chapter-done-bar" id="chapterDoneBar" hidden>
-      <span class="done-msg" id="doneMsg">本章已完成 🎉</span>
-      <span class="spacer"></span>
-      <button class="mini-btn primary" id="doneNext">写下一章 →</button>
-      <button class="mini-btn" id="doneNew">新建章节</button>
-      <button class="mini-btn" id="doneStay">留在本章</button>
     </div>
 
     <!-- 查找替换条 -->
