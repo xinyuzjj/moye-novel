@@ -101,8 +101,8 @@ function buildDom(dataDir) {
   ok('右侧知识库面板直接可见（#kbPanel 未隐藏）', doc3.getElementById('kbPanel') && doc3.getElementById('kbPanel').hidden === false);
   ok('右侧存在宽度拖拽条（.outline-resizer）', !!doc3.getElementById('outlineResizer'));
   ok('知识库面板含「连接文件夹」按钮', !!doc3.getElementById('kbConnect'));
-  ok('未连接外部库时显示「未连接外部库」提示', doc3.getElementById('kbFolderLabel') && doc3.getElementById('kbFolderLabel').textContent.trim() === '未连接外部库');
-  ok('知识库面板含搜索框与列表', !!doc3.getElementById('kbSearch') && !!doc3.getElementById('kbList'));
+  ok('未连接外部库时显示「未连接知识库」提示', doc3.getElementById('kbFolderLabel') && doc3.getElementById('kbFolderLabel').textContent.trim() === '未连接知识库');
+  ok('知识库面板含列表与切换按钮', !!doc3.getElementById('kbList') && !!doc3.getElementById('kbSwitch'));
   dom3.window.close();
 
   try { fs.rmSync(dataDir, { recursive: true, force: true }); } catch (e) {}

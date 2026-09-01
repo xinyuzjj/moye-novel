@@ -173,14 +173,14 @@
     </div>
     <div class="kb-panel" id="kbPanel">
       <div class="kb-toolbar">
-        <button class="mini-btn primary" id="kbConnect">连接文件夹</button>
+        <button class="mini-btn primary" id="kbConnect" hidden>连接文件夹</button>
         <span class="kb-folder" id="kbFolderLabel" title="">未连接</span>
+        <button class="mini-btn tiny" id="kbSwitch">切换</button>
       </div>
-      <input type="search" id="kbSearch" class="kb-search" placeholder="搜索笔记名…" autocomplete="off">
       <div class="kb-list" id="kbList"></div>
       <div class="kb-view" id="kbView" hidden>
         <div class="kb-view-head">
-          <button class="mini-btn tiny" id="kbBack">← 列表</button>
+          <button class="mini-btn tiny" id="kbBack">← 返回列表</button>
           <span class="kb-view-title" id="kbViewTitle"></span>
         </div>
         <div class="kb-view-body markdown-body" id="kbViewBody"></div>

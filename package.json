@@ -1,6 +1,6 @@
 {
   "name": "moye-novel",
-  "version": "2.4.3",
+  "version": "2.4.4",
   "private": true,
   "description": "墨页 · 本地轻量小说写作软件（Electron 桌面壳，原生 fs 持久化）",
   "main": "main.js",

@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '2.4.3';
+  const APP_VERSION = '2.4.4';
 
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
@@ -516,47 +516,73 @@
     c.textContent = n ? n + ' 篇笔记' : '知识库';
   }
 
-  /* ───────── 知识库（本书资料 + Obsidian / 本地 .md 文件夹，只读） ───────── */
-  let kbFiles = [], kbRoot = '', kbQuery = '';
+  let kbFiles = [], kbRoot = '', kbOpenRel = '';
+  const KB_COLLAPSE_KEY = 'kbCollapsedFolders';
 
   async function renderKb() {
-    const label = $('#kbFolderLabel'), list = $('#kbList');
+    const label = $('#kbFolderLabel'), list = $('#kbList'), connect = $('#kbConnect'), switchBtn = $('#kbSwitch'), bar = $('.kb-toolbar');
     if (!label || !list) return;
     kbRoot = (S && S.kbFolder) || '';
+    showKbList();
     if (!kbRoot) {
-      label.textContent = '未连接外部库'; label.title = '';
-    } else {
-      label.textContent = shortPath(kbRoot); label.title = kbRoot;
-      list.innerHTML = '<div class="empty-tip">正在读取…</div>';
-      try {
-        const r = await window.electronAPI.kbList(kbRoot);
-        if (!r || !r.ok) { list.innerHTML = '<div class="empty-tip">读取失败：' + esc((r && r.error) || '未知错误') + '</div>'; kbFiles = []; updateOutlineCount(); return; }
-        kbFiles = r.files || [];
-        if (r.capped) toast('笔记过多，仅显示前 ' + r.files.length + ' 篇');
-      } catch (e) {
-        list.innerHTML = '<div class="empty-tip">读取异常：' + esc(e.message || '') + '</div>'; kbFiles = [];
-        updateOutlineCount(); return;
-      }
+      label.textContent = '未连接知识库'; label.title = '';
+      label.classList.add('empty');
+      if (connect) connect.hidden = false;
+      if (switchBtn) switchBtn.hidden = true;
+      if (bar) bar.classList.add('disconnected');
+      list.innerHTML = '<div class="empty-tip">点「连接文件夹」选择 Obsidian 库<br>或任意 .md 笔记文件夹</div>';
+      kbFiles = []; updateOutlineCount(); return;
     }
-    renderKbList();
+    if (connect) connect.hidden = true;
+    if (switchBtn) switchBtn.hidden = false;
+    if (bar) bar.classList.remove('disconnected');
+    label.classList.remove('empty');
+    label.textContent = shortPath(kbRoot); label.title = kbRoot;
+    list.innerHTML = '<div class="empty-tip">正在读取…</div>';
+    try {
+      const r = await window.electronAPI.kbList(kbRoot);
+      if (!r || !r.ok) { list.innerHTML = '<div class="empty-tip">读取失败：' + esc((r && r.error) || '未知错误') + '</div>'; kbFiles = []; updateOutlineCount(); return; }
+      kbFiles = r.files || [];
+      if (r.capped) toast('笔记过多，仅显示前 ' + r.files.length + ' 篇');
+      renderKbList();
+    } catch (e) {
+      list.innerHTML = '<div class="empty-tip">读取异常：' + esc(e.message || '') + '</div>'; kbFiles = [];
+    }
     updateOutlineCount();
   }
   function shortPath(p) {
     if (!p) return '';
     const parts = p.split(/[\\/]/); return parts.length > 2 ? parts.slice(-2).join('/') : p;
   }
+  function kbCollapsedFolders() {
+    try { return JSON.parse(localStorage.getItem(KB_COLLAPSE_KEY) || '{}'); } catch (e) { return {}; }
+  }
+  function kbToggleFolder(name) {
+    const s = kbCollapsedFolders(); s[name] = !s[name]; localStorage.setItem(KB_COLLAPSE_KEY, JSON.stringify(s));
+  }
+  function kbFolderKey(rel) {
+    const i = rel.lastIndexOf('/'); return i >= 0 ? rel.slice(0, i) : '(根目录)';
+  }
   function renderKbList() {
     const list = $('#kbList'); if (!list) return;
-    const q = (kbQuery || '').trim().toLowerCase();
-    const hits = q ? kbFiles.filter((f) => f.name.toLowerCase().includes(q) || f.rel.toLowerCase().includes(q)) : kbFiles;
-    if (!hits.length) { list.innerHTML = '<div class="empty-tip">' + (kbRoot ? '没有匹配的笔记' : '点「连接文件夹」选择 Obsidian 库或任意 .md 笔记文件夹') + '</div>'; return; }
-    list.innerHTML = hits.map((f) => {
-      const folder = f.rel.indexOf('/') >= 0 ? f.rel.slice(0, f.rel.lastIndexOf('/')) : '';
-      return '<div class="kb-item" data-rel="' + esc(f.rel) + '">' +
-        '<div class="kb-item-name">' + esc(f.name) + '</div>' +
-        (folder ? '<div class="kb-item-folder">' + esc(folder) + '</div>' : '') +
-        '</div>';
-    }).join('');
+    if (!kbRoot) { list.innerHTML = '<div class="empty-tip">点「连接文件夹」选择 Obsidian 库<br>或任意 .md 笔记文件夹</div>'; return; }
+    if (!kbFiles.length) { list.innerHTML = '<div class="empty-tip">该文件夹下没有 .md 笔记</div>'; return; }
+    const collapsed = kbCollapsedFolders();
+    const groups = {};
+    kbFiles.forEach((f) => { const k = kbFolderKey(f.rel); (groups[k] = groups[k] || []).push(f); });
+    const order = Object.keys(groups).sort((a, b) => a.localeCompare(b, 'zh-CN'));
+    let html = '';
+    order.forEach((folder) => {
+      const isRoot = folder === '(根目录)';
+      const folded = !!collapsed[folder];
+      const display = isRoot ? '根目录' : folder.replace(/\//g, ' / ');
+      html += '<div class="kb-folder-group">' +
+        '<div class="kb-folder-title ' + (folded ? 'collapsed' : '') + '" data-folder="' + esc(folder) + '">' + esc(display) + ' <span class="muted">(' + groups[folder].length + ')</span></div>' +
+        '<div class="kb-folder-items" ' + (folded ? 'hidden' : '') + '>' +
+        groups[folder].map((f) => '<div class="kb-item' + (kbOpenRel === f.rel ? ' active' : '') + '" data-rel="' + esc(f.rel) + '"><div class="kb-item-name">' + esc(f.name) + '</div></div>').join('') +
+        '</div></div>';
+    });
+    list.innerHTML = html;
   }
 
   function showKbList() { const l = $('#kbList'), v = $('#kbView'); if (l) l.hidden = false; if (v) v.hidden = true; }
@@ -564,6 +590,8 @@
 
   async function kbOpenItem(rel) {
     const f = kbFiles.find((x) => x.rel === rel); if (!f) return;
+    kbOpenRel = rel;
+    renderKbList(); // 刷新 active 高亮
     const titleEl = $('#kbViewTitle'), body = $('#kbViewBody');
     if (titleEl) titleEl.textContent = f.name;
     if (body) body.innerHTML = '<div class="empty-tip">加载中…</div>';
@@ -1095,19 +1123,23 @@
     initResizer();
 
     // 知识库（只读，连接本地 .md 文件夹）
-    $('#kbConnect').addEventListener('click', async () => {
+    async function kbPickFolder() {
       if (!window.electronAPI || !window.electronAPI.kbSelectFolder) { toast('知识库仅桌面端支持'); return; }
       const r = await window.electronAPI.kbSelectFolder();
       if (!r || !r.ok) { toast('选择失败：' + ((r && r.error) || '')); return; }
       if (!r.path) return;
+      kbOpenRel = '';
       S.kbFolder = r.path; scheduleSave(); renderKb(); toast('已连接知识库');
-    });
-    $('#kbSearch').addEventListener('input', (e) => { kbQuery = e.target.value || ''; renderKbList(); });
+    }
+    $('#kbConnect').addEventListener('click', kbPickFolder);
+    $('#kbSwitch').addEventListener('click', kbPickFolder);
     $('#kbList').addEventListener('click', (e) => {
-      const it = e.target.closest('.kb-item'); if (!it) return;
-      kbOpenItem(it.dataset.rel);
+      const folder = e.target.closest('.kb-folder-title');
+      if (folder) { kbToggleFolder(folder.dataset.folder); renderKbList(); return; }
+      const it = e.target.closest('.kb-item');
+      if (it) kbOpenItem(it.dataset.rel);
     });
-    $('#kbBack').addEventListener('click', () => showKbList());
+    $('#kbBack').addEventListener('click', () => { kbOpenRel = ''; renderKbList(); showKbList(); });
 
     // 查找
     $('#btnFind') && $('#btnFind').addEventListener('click', () => $('#findBar').classList.add('show'));
